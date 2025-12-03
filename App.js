@@ -11,6 +11,7 @@ import {
   ScrollView,
   Platform,
   InteractionManager,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
@@ -20,12 +21,438 @@ import * as SQLite from 'expo-sqlite';
 import * as Haptics from 'expo-haptics';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { Linking } from 'react-native';
+
+// Haptics Helper Functions (Expo Go uyumluluğu için)
+const safeImpactAsync = (style = 'light') => {
+  try {
+    if (Haptics.ImpactFeedbackStyle && Haptics.ImpactFeedbackStyle[style]) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle[style]);
+    } else {
+      Haptics.impactAsync(style);
+    }
+  } catch (error) {
+    // Haptic feedback desteklenmiyorsa sessizce devam et
+  }
+};
+
+const safeNotificationAsync = (type = 'success') => {
+  try {
+    if (Haptics.NotificationFeedbackType && Haptics.NotificationFeedbackType[type]) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType[type]);
+    } else {
+      Haptics.notificationAsync(type);
+    }
+  } catch (error) {
+    // Haptic feedback desteklenmiyorsa sessizce devam et
+  }
+};
 
 // Database Context
 const DatabaseContext = createContext(null);
 
 export const useDatabase = () => {
   return useContext(DatabaseContext);
+};
+
+// Dil Çevirileri
+const translations = {
+  tr: {
+    appName: 'Zikir Matik',
+    selectZikir: 'Zikir Seçin',
+    customZikir: 'Özel Zikirler',
+    addCustomZikir: 'Özel Zikir Ekle',
+    customZikirName: 'Özel zikir adı',
+    arabicText: 'Arapça metin (opsiyonel)',
+    cancel: 'İptal',
+    add: 'Ekle',
+    delete: 'Sil',
+    today: 'Bugünkü Zikir',
+    target: 'Hedef',
+    progress: 'İlerleme',
+    reset: 'Sıfırla',
+    analytics: 'Analiz',
+    settings: 'Ayarlar',
+    zikirler: 'Zikirler',
+    recommendedZikirs: 'Önerilen Zikirler',
+    custom: 'Özel',
+    success: 'Başarılı',
+    error: 'Hata',
+    customZikirAdded: 'Özel zikir eklendi',
+    customZikirDeleted: 'Özel zikir silindi',
+    deleteCustomZikir: 'Özel Zikiri Sil',
+    deleteCustomZikirConfirm: 'zikiri silinecek. Bu işlem geri alınamaz. Emin misiniz?',
+    customZikirNotDeleted: 'Özel zikir silinemedi',
+    customZikirNotAdded: 'Zikir eklenemedi',
+    customZikirExists: 'Bu zikir adı zaten kullanılıyor',
+    enterZikirName: 'Lütfen bir zikir adı girin',
+    zikir: 'Zikir',
+    back: 'Geri',
+    setTarget: 'Günlük Hedef Belirle',
+    targetPlaceholder: 'Hedef sayı',
+    save: 'Kaydet',
+    completed: 'Tamamlandı!',
+    total: 'Toplam',
+    // Analytics Screen
+    zikirStatistics: 'Zikir İstatistikleri',
+    statistics: 'İstatistikler',
+    history: 'Geçmiş',
+    daily: 'Günlük',
+    weekly: 'Haftalık',
+    monthly: 'Aylık',
+    today: 'Bugün',
+    thisWeek: 'Bu Hafta',
+    thisMonth: 'Bu Ay',
+    dailyHadith: 'Günün Hadisi',
+    generalStatistics: 'Genel İstatistikler',
+    avgDaily: 'Ortalama Günlük',
+    dailyStreak: 'Günlük Seri',
+    targetCompleted: 'Hedef Tamamlandı',
+    bestDay: 'En İyi Gün',
+    last7DaysTrend: 'Son 7 Gün Trendi',
+    achievements: 'Başarı Rozetleri',
+    unlocked: 'kazanıldı',
+    // Settings Screen
+    appSettings: 'Uygulama Ayarları',
+    theme: 'Tema',
+    defaultTarget: 'Varsayılan Hedef',
+    defaultTargetDesc: 'Yeni zikirler için varsayılan günlük hedef (şu an: 100)',
+    hapticFeedback: 'Haptic Feedback',
+    dailyReminder: 'Günlük Hatırlatıcı',
+    on: 'Açık',
+    off: 'Kapalı',
+    time: 'Saat (HH:MM)',
+    dataManagement: 'Veri Yönetimi',
+    resetAllDataDesc: 'Tüm verileri sıfırla',
+    resetAllData: 'Tüm Verileri Sıfırla',
+    about: 'Uygulama Hakkında',
+    version: 'Versiyon',
+    developer: 'Geliştirici',
+    resetConfirm: 'Tüm verileri sıfırlamak istediğinize emin misiniz?',
+    resetSuccess: 'Tüm veriler sıfırlandı',
+    resetError: 'Veriler sıfırlanamadı',
+    targetUpdated: 'Varsayılan hedef kaydedildi',
+    reminderUpdated: 'Hatırlatıcı saati güncellendi',
+    enterValidNumber: 'Lütfen geçerli bir sayı girin (minimum 1)',
+    resetCounterConfirm: 'Sayacı sıfırlamak istediğinize emin misiniz?',
+    // Achievements
+    achievementsUnlocked: 'kazanıldı',
+    achievement_first_100_title: 'İlk 100',
+    achievement_first_100_desc: 'Toplam 100 zikir yap',
+    achievement_first_1000_title: 'Binlerce Zikir',
+    achievement_first_1000_desc: 'Toplam 1000 zikir yap',
+    achievement_streak_7_title: '7 Günlük Seri',
+    achievement_streak_7_desc: '7 gün üst üste zikir yap',
+    achievement_streak_30_title: '30 Günlük Seri',
+    achievement_streak_30_desc: '30 gün üst üste zikir yap',
+    achievement_perfect_day_title: 'Mükemmel Gün',
+    achievement_perfect_day_desc: 'Bir günde 500+ zikir yap',
+    achievement_all_targets_title: 'Hedef Ustası',
+    achievement_all_targets_desc: 'Bir günde tüm hedefleri tamamla',
+    achievement_first_10000_title: 'On Binlerce Zikir',
+    achievement_first_10000_desc: 'Toplam 10,000 zikir yap',
+    achievement_first_50000_title: 'Efsanevi Sayı',
+    achievement_first_50000_desc: 'Toplam 50,000 zikir yap',
+    achievement_streak_100_title: '100 Günlük Seri',
+    achievement_streak_100_desc: '100 gün üst üste zikir yap',
+    achievement_streak_365_title: 'Yıllık Seri',
+    achievement_streak_365_desc: '365 gün üst üste zikir yap',
+    achievement_marathon_title: 'Maraton',
+    achievement_marathon_desc: 'Bir günde 1000+ zikir yap',
+    achievement_consistency_king_title: 'Tutarlılık Kralı',
+    achievement_consistency_king_desc: '14 gün üst üste zikir yap',
+    achievement_dedication_title: 'Adanmışlık',
+    achievement_dedication_desc: '50 gün üst üste zikir yap',
+    achievement_first_week_title: 'İlk Hafta',
+    achievement_first_week_desc: '7 gün zikir yap (seri olmasa bile)',
+    achievement_first_month_title: 'İlk Ay',
+    achievement_first_month_desc: '30 gün zikir yap (seri olmasa bile)',
+    achievement_first_100_days_title: '100 Gün',
+    achievement_first_100_days_desc: '100 gün zikir yap (seri olmasa bile)',
+    achievement_daily_master_title: 'Günlük Usta',
+    achievement_daily_master_desc: 'Ortalama günlük 200+ zikir yap',
+    achievement_super_daily_title: 'Süper Günlük',
+    achievement_super_daily_desc: 'Ortalama günlük 500+ zikir yap',
+    // Themes
+    theme_dark_name: 'Koyu Tema',
+    theme_dark_description: 'Klasik koyu tema',
+    theme_green_name: 'Yeşil Tema',
+    theme_green_description: 'İslami yeşil tema',
+    theme_gold_name: 'Altın Tema',
+    theme_gold_description: 'Lüks altın tema',
+    theme_blue_name: 'Mavi Tema',
+    theme_blue_description: 'Sakin mavi tema',
+    theme_purple_name: 'Mor Tema',
+    theme_purple_description: 'Modern mor tema',
+  },
+  en: {
+    appName: 'Dhikr Counter',
+    selectZikir: 'Select Dhikr',
+    customZikir: 'Custom Dhikrs',
+    addCustomZikir: 'Add Custom Dhikr',
+    customZikirName: 'Custom dhikr name',
+    arabicText: 'Arabic text (optional)',
+    cancel: 'Cancel',
+    add: 'Add',
+    delete: 'Delete',
+    today: "Today's Dhikr",
+    target: 'Target',
+    progress: 'Progress',
+    reset: 'Reset',
+    analytics: 'Analytics',
+    settings: 'Settings',
+    zikirler: 'Dhikrs',
+    recommendedZikirs: 'Recommended Dhikrs',
+    custom: 'Custom',
+    success: 'Success',
+    error: 'Error',
+    customZikirAdded: 'Custom dhikr added',
+    customZikirDeleted: 'Custom dhikr deleted',
+    deleteCustomZikir: 'Delete Custom Dhikr',
+    deleteCustomZikirConfirm: 'dhikr will be deleted. This action cannot be undone. Are you sure?',
+    customZikirNotDeleted: 'Custom dhikr could not be deleted',
+    customZikirNotAdded: 'Dhikr could not be added',
+    customZikirExists: 'This dhikr name is already in use',
+    enterZikirName: 'Please enter a dhikr name',
+    zikir: 'Dhikr',
+    back: 'Back',
+    setTarget: 'Set Daily Target',
+    targetPlaceholder: 'Target number',
+    save: 'Save',
+    completed: 'Completed!',
+    total: 'Total',
+    // Analytics Screen
+    zikirStatistics: 'Dhikr Statistics',
+    statistics: 'Statistics',
+    history: 'History',
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    today: 'Today',
+    thisWeek: 'This Week',
+    thisMonth: 'This Month',
+    dailyHadith: 'Daily Hadith',
+    generalStatistics: 'General Statistics',
+    avgDaily: 'Average Daily',
+    dailyStreak: 'Daily Streak',
+    targetCompleted: 'Target Completed',
+    bestDay: 'Best Day',
+    last7DaysTrend: 'Last 7 Days Trend',
+    achievements: 'Achievements',
+    unlocked: 'unlocked',
+    // Settings Screen
+    appSettings: 'App Settings',
+    theme: 'Theme',
+    defaultTarget: 'Default Target',
+    defaultTargetDesc: 'Default daily target for new dhikrs (currently: 100)',
+    hapticFeedback: 'Haptic Feedback',
+    dailyReminder: 'Daily Reminder',
+    on: 'On',
+    off: 'Off',
+    time: 'Time (HH:MM)',
+    dataManagement: 'Data Management',
+    resetAllDataDesc: 'Reset all data',
+    resetAllData: 'Reset All Data',
+    about: 'About',
+    version: 'Version',
+    developer: 'Developer',
+    resetConfirm: 'Are you sure you want to reset all data?',
+    resetSuccess: 'All data has been reset',
+    resetError: 'Failed to reset data',
+    targetUpdated: 'Default target saved',
+    reminderUpdated: 'Reminder time updated',
+    enterValidNumber: 'Please enter a valid number (minimum 1)',
+    resetCounterConfirm: 'Are you sure you want to reset the counter?',
+    // Achievements
+    achievementsUnlocked: 'unlocked',
+    achievement_first_100_title: 'First 100',
+    achievement_first_100_desc: 'Complete 100 total dhikrs',
+    achievement_first_1000_title: 'Thousands of Dhikrs',
+    achievement_first_1000_desc: 'Complete 1000 total dhikrs',
+    achievement_streak_7_title: '7 Day Streak',
+    achievement_streak_7_desc: 'Do dhikr 7 days in a row',
+    achievement_streak_30_title: '30 Day Streak',
+    achievement_streak_30_desc: 'Do dhikr 30 days in a row',
+    achievement_perfect_day_title: 'Perfect Day',
+    achievement_perfect_day_desc: 'Do 500+ dhikrs in one day',
+    achievement_all_targets_title: 'Target Master',
+    achievement_all_targets_desc: 'Complete all targets in one day',
+    achievement_first_10000_title: 'Ten Thousands',
+    achievement_first_10000_desc: 'Complete 10,000 total dhikrs',
+    achievement_first_50000_title: 'Legendary Number',
+    achievement_first_50000_desc: 'Complete 50,000 total dhikrs',
+    achievement_streak_100_title: '100 Day Streak',
+    achievement_streak_100_desc: 'Do dhikr 100 days in a row',
+    achievement_streak_365_title: 'Yearly Streak',
+    achievement_streak_365_desc: 'Do dhikr 365 days in a row',
+    achievement_marathon_title: 'Marathon',
+    achievement_marathon_desc: 'Do 1000+ dhikrs in one day',
+    achievement_consistency_king_title: 'Consistency King',
+    achievement_consistency_king_desc: 'Do dhikr 14 days in a row',
+    achievement_dedication_title: 'Dedication',
+    achievement_dedication_desc: 'Do dhikr 50 days in a row',
+    achievement_first_week_title: 'First Week',
+    achievement_first_week_desc: 'Do dhikr for 7 days (not necessarily consecutive)',
+    achievement_first_month_title: 'First Month',
+    achievement_first_month_desc: 'Do dhikr for 30 days (not necessarily consecutive)',
+    achievement_first_100_days_title: '100 Days',
+    achievement_first_100_days_desc: 'Do dhikr for 100 days (not necessarily consecutive)',
+    achievement_daily_master_title: 'Daily Master',
+    achievement_daily_master_desc: 'Average 200+ dhikrs per day',
+    achievement_super_daily_title: 'Super Daily',
+    achievement_super_daily_desc: 'Average 500+ dhikrs per day',
+    // Themes
+    theme_dark_name: 'Dark Theme',
+    theme_dark_description: 'Classic dark theme',
+    theme_green_name: 'Green Theme',
+    theme_green_description: 'Islamic green theme',
+    theme_gold_name: 'Gold Theme',
+    theme_gold_description: 'Luxury gold theme',
+    theme_blue_name: 'Blue Theme',
+    theme_blue_description: 'Calm blue theme',
+    theme_purple_name: 'Purple Theme',
+    theme_purple_description: 'Modern purple theme',
+  },
+  ar: {
+    appName: 'عداد الذكر',
+    selectZikir: 'اختر الذكر',
+    customZikir: 'أذكار مخصصة',
+    addCustomZikir: 'إضافة ذكر مخصص',
+    customZikirName: 'اسم الذكر المخصص',
+    arabicText: 'النص العربي (اختياري)',
+    cancel: 'إلغاء',
+    add: 'إضافة',
+    delete: 'حذف',
+    today: 'ذكر اليوم',
+    target: 'الهدف',
+    progress: 'التقدم',
+    reset: 'إعادة تعيين',
+    analytics: 'التحليلات',
+    settings: 'الإعدادات',
+    zikirler: 'الأذكار',
+    recommendedZikirs: 'الأذكار المقترحة',
+    custom: 'مخصص',
+    success: 'نجح',
+    error: 'خطأ',
+    customZikirAdded: 'تمت إضافة الذكر المخصص',
+    customZikirDeleted: 'تم حذف الذكر المخصص',
+    deleteCustomZikir: 'حذف الذكر المخصص',
+    deleteCustomZikirConfirm: 'سيتم حذف الذكر. لا يمكن التراجع عن هذا الإجراء. هل أنت متأكد؟',
+    customZikirNotDeleted: 'لم يتم حذف الذكر المخصص',
+    customZikirNotAdded: 'لم يتم إضافة الذكر',
+    customZikirExists: 'اسم الذكر هذا مستخدم بالفعل',
+    enterZikirName: 'الرجاء إدخال اسم الذكر',
+    zikir: 'الذكر',
+    back: 'رجوع',
+    setTarget: 'تعيين الهدف اليومي',
+    targetPlaceholder: 'عدد الهدف',
+    save: 'حفظ',
+    completed: 'مكتمل!',
+    total: 'المجموع',
+    // Analytics Screen
+    zikirStatistics: 'إحصائيات الذكر',
+    statistics: 'الإحصائيات',
+    history: 'السجل',
+    daily: 'يومي',
+    weekly: 'أسبوعي',
+    monthly: 'شهري',
+    today: 'اليوم',
+    thisWeek: 'هذا الأسبوع',
+    thisMonth: 'هذا الشهر',
+    dailyHadith: 'حديث اليوم',
+    generalStatistics: 'الإحصائيات العامة',
+    avgDaily: 'المتوسط اليومي',
+    dailyStreak: 'السلسلة اليومية',
+    targetCompleted: 'الهدف مكتمل',
+    bestDay: 'أفضل يوم',
+    last7DaysTrend: 'اتجاه آخر 7 أيام',
+    achievements: 'الإنجازات',
+    unlocked: 'مفتوح',
+    // Settings Screen
+    appSettings: 'إعدادات التطبيق',
+    theme: 'المظهر',
+    defaultTarget: 'الهدف الافتراضي',
+    defaultTargetDesc: 'الهدف اليومي الافتراضي للأذكار الجديدة (حالياً: 100)',
+    hapticFeedback: 'الرد اللمسي',
+    dailyReminder: 'التذكير اليومي',
+    on: 'مفتوح',
+    off: 'مغلق',
+    time: 'الوقت (س:د)',
+    dataManagement: 'إدارة البيانات',
+    resetAllDataDesc: 'إعادة تعيين جميع البيانات',
+    resetAllData: 'إعادة تعيين جميع البيانات',
+    about: 'حول التطبيق',
+    version: 'الإصدار',
+    developer: 'المطور',
+    resetConfirm: 'هل أنت متأكد أنك تريد إعادة تعيين جميع البيانات؟',
+    resetSuccess: 'تم إعادة تعيين جميع البيانات',
+    resetError: 'فشل إعادة تعيين البيانات',
+    targetUpdated: 'تم حفظ الهدف الافتراضي',
+    reminderUpdated: 'تم تحديث وقت التذكير',
+    enterValidNumber: 'الرجاء إدخال رقم صحيح (الحد الأدنى 1)',
+    resetCounterConfirm: 'هل أنت متأكد أنك تريد إعادة تعيين العداد؟',
+    // Achievements
+    achievementsUnlocked: 'مفتوح',
+    achievement_first_100_title: 'أول 100',
+    achievement_first_100_desc: 'أكمل 100 ذكر إجمالي',
+    achievement_first_1000_title: 'آلاف الأذكار',
+    achievement_first_1000_desc: 'أكمل 1000 ذكر إجمالي',
+    achievement_streak_7_title: 'سلسلة 7 أيام',
+    achievement_streak_7_desc: 'أدِ الذكر 7 أيام متتالية',
+    achievement_streak_30_title: 'سلسلة 30 يوم',
+    achievement_streak_30_desc: 'أدِ الذكر 30 يوم متتالية',
+    achievement_perfect_day_title: 'يوم مثالي',
+    achievement_perfect_day_desc: 'أدِ 500+ ذكر في يوم واحد',
+    achievement_all_targets_title: 'سيد الهدف',
+    achievement_all_targets_desc: 'أكمل جميع الأهداف في يوم واحد',
+    achievement_first_10000_title: 'عشرة آلاف',
+    achievement_first_10000_desc: 'أكمل 10,000 ذكر إجمالي',
+    achievement_first_50000_title: 'عدد أسطوري',
+    achievement_first_50000_desc: 'أكمل 50,000 ذكر إجمالي',
+    achievement_streak_100_title: 'سلسلة 100 يوم',
+    achievement_streak_100_desc: 'أدِ الذكر 100 يوم متتالية',
+    achievement_streak_365_title: 'سلسلة سنوية',
+    achievement_streak_365_desc: 'أدِ الذكر 365 يوم متتالية',
+    achievement_marathon_title: 'ماراثون',
+    achievement_marathon_desc: 'أدِ 1000+ ذكر في يوم واحد',
+    achievement_consistency_king_title: 'ملك الثبات',
+    achievement_consistency_king_desc: 'أدِ الذكر 14 يوم متتالية',
+    achievement_dedication_title: 'التفاني',
+    achievement_dedication_desc: 'أدِ الذكر 50 يوم متتالية',
+    achievement_first_week_title: 'الأسبوع الأول',
+    achievement_first_week_desc: 'أدِ الذكر لمدة 7 أيام (ليس بالضرورة متتالية)',
+    achievement_first_month_title: 'الشهر الأول',
+    achievement_first_month_desc: 'أدِ الذكر لمدة 30 يوم (ليس بالضرورة متتالية)',
+    achievement_first_100_days_title: '100 يوم',
+    achievement_first_100_days_desc: 'أدِ الذكر لمدة 100 يوم (ليس بالضرورة متتالية)',
+    achievement_daily_master_title: 'سيد اليومي',
+    achievement_daily_master_desc: 'متوسط 200+ ذكر يومياً',
+    achievement_super_daily_title: 'يومي فائق',
+    achievement_super_daily_desc: 'متوسط 500+ ذكر يومياً',
+    // Themes
+    theme_dark_name: 'المظهر الداكن',
+    theme_dark_description: 'مظهر داكن كلاسيكي',
+    theme_green_name: 'المظهر الأخضر',
+    theme_green_description: 'مظهر أخضر إسلامي',
+    theme_gold_name: 'المظهر الذهبي',
+    theme_gold_description: 'مظهر ذهبي فاخر',
+    theme_blue_name: 'المظهر الأزرق',
+    theme_blue_description: 'مظهر أزرق هادئ',
+    theme_purple_name: 'المظهر البنفسجي',
+    theme_purple_description: 'مظهر بنفسجي حديث',
+  },
+};
+
+// Dil Context
+const LanguageContext = createContext(null);
+
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    return { language: 'tr', t: translations.tr, setLanguage: () => {} };
+  }
+  return context;
 };
 
 // Tema Tanımları
@@ -112,8 +539,8 @@ const themes = {
   },
 };
 
-// Günlük Hadisler (365 Hadis)
-const getDailyHadith = () => {
+// Günlük Hadisler (Çok Dilli)
+const getDailyHadith = (language = 'tr') => {
   const startDate = new Date('2024-01-01');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -121,42 +548,108 @@ const getDailyHadith = () => {
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   const dayOfYear = (diffDays % 365) + 1;
   
-  const hadiths = [
-    { text: "Allah'ın en çok sevdiği amel, az da olsa devamlı olanıdır.", source: "Buhari, Müslim" },
-    { text: "İman yetmiş küsur şubedir. En üstünü 'La ilahe illallah' demek, en altı ise yoldan rahatsızlık veren şeyi kaldırmaktır.", source: "Buhari, Müslim" },
-    { text: "Mümin, mümine karşı bir binanın tuğlaları gibidir. Birbirini sıkıca tutar.", source: "Buhari" },
-    { text: "Sizden biriniz, kendisi için istediğini kardeşi için de istemedikçe gerçek anlamda iman etmiş olmaz.", source: "Buhari, Müslim" },
-    { text: "Allah, sizin dış görünüşünüze ve mallarınıza bakmaz. O, kalplerinize ve amellerinize bakar.", source: "Müslim" },
-    { text: "İnsanların en hayırlısı, insanlara en çok faydalı olandır.", source: "Taberani" },
-    { text: "Kolaylaştırın, zorlaştırmayın. Müjdeleyin, nefret ettirmeyin.", source: "Buhari" },
-    { text: "Allah'ın rızası, anne-babanın rızasındadır. Allah'ın gazabı da anne-babanın gazabındadır.", source: "Tirmizi" },
-    { text: "Temizlik imanın yarısıdır.", source: "Müslim" },
-    { text: "Sabır, imanın yarısıdır.", source: "Tirmizi" },
-    { text: "İlim öğrenmek, her Müslüman erkek ve kadına farzdır.", source: "İbn Mace" },
-    { text: "İki kişi arasında adaletle hükmetmek sadakadır.", source: "Buhari, Müslim" },
-    { text: "Güzel söz sadakadır.", source: "Buhari, Müslim" },
-    { text: "Yoldan rahatsızlık veren bir şeyi kaldırmak sadakadır.", source: "Buhari, Müslim" },
-    { text: "Mümin, aynı delikten iki kez sokulmaz.", source: "Buhari, Müslim" },
-    { text: "Mümin, başkalarıyla iyi geçinen ve kendisiyle iyi geçinilen kimsedir.", source: "Tirmizi" },
-    { text: "Allah'ın en çok sevdiği kul, ailesine en çok faydalı olandır.", source: "Tirmizi" },
-    { text: "En hayırlınız, Kur'an'ı öğrenen ve öğretendir.", source: "Buhari" },
-    { text: "İnsanların en hayırlısı, ömrü uzun, ameli güzel olandır.", source: "Tirmizi" },
-    { text: "Allah, sizin bedenlerinize ve suretlerinize bakmaz, kalplerinize ve amellerinize bakar.", source: "Müslim" },
-    { text: "Mümin, mümine karşı bir binanın tuğlaları gibidir.", source: "Buhari" },
-    { text: "İman yetmiş küsur şubedir. Haya da imanın bir şubesidir.", source: "Buhari, Müslim" },
-    { text: "Allah'ın en çok sevdiği amel, az da olsa devamlı olanıdır.", source: "Buhari, Müslim" },
-    { text: "Mümin, mümine karşı bir binanın tuğlaları gibidir. Birbirini sıkıca tutar.", source: "Buhari" },
-    { text: "Sizden biriniz, kendisi için istediğini kardeşi için de istemedikçe gerçek anlamda iman etmiş olmaz.", source: "Buhari, Müslim" },
-    { text: "Allah, sizin dış görünüşünüze ve mallarınıza bakmaz. O, kalplerinize ve amellerinize bakar.", source: "Müslim" },
-    { text: "İnsanların en hayırlısı, insanlara en çok faydalı olandır.", source: "Taberani" },
-    { text: "Kolaylaştırın, zorlaştırmayın. Müjdeleyin, nefret ettirmeyin.", source: "Buhari" },
-    { text: "Allah'ın rızası, anne-babanın rızasındadır. Allah'ın gazabı da anne-babanın gazabındadır.", source: "Tirmizi" },
-    { text: "Temizlik imanın yarısıdır.", source: "Müslim" },
-  ];
+  const hadiths = {
+    tr: [
+      { text: "Allah'ın en çok sevdiği amel, az da olsa devamlı olanıdır.", source: "Buhari, Müslim" },
+      { text: "İman yetmiş küsur şubedir. En üstünü 'La ilahe illallah' demek, en altı ise yoldan rahatsızlık veren şeyi kaldırmaktır.", source: "Buhari, Müslim" },
+      { text: "Mümin, mümine karşı bir binanın tuğlaları gibidir. Birbirini sıkıca tutar.", source: "Buhari" },
+      { text: "Sizden biriniz, kendisi için istediğini kardeşi için de istemedikçe gerçek anlamda iman etmiş olmaz.", source: "Buhari, Müslim" },
+      { text: "Allah, sizin dış görünüşünüze ve mallarınıza bakmaz. O, kalplerinize ve amellerinize bakar.", source: "Müslim" },
+      { text: "İnsanların en hayırlısı, insanlara en çok faydalı olandır.", source: "Taberani" },
+      { text: "Kolaylaştırın, zorlaştırmayın. Müjdeleyin, nefret ettirmeyin.", source: "Buhari" },
+      { text: "Allah'ın rızası, anne-babanın rızasındadır. Allah'ın gazabı da anne-babanın gazabındadır.", source: "Tirmizi" },
+      { text: "Temizlik imanın yarısıdır.", source: "Müslim" },
+      { text: "Sabır, imanın yarısıdır.", source: "Tirmizi" },
+      { text: "İlim öğrenmek, her Müslüman erkek ve kadına farzdır.", source: "İbn Mace" },
+      { text: "İki kişi arasında adaletle hükmetmek sadakadır.", source: "Buhari, Müslim" },
+      { text: "Güzel söz sadakadır.", source: "Buhari, Müslim" },
+      { text: "Yoldan rahatsızlık veren bir şeyi kaldırmak sadakadır.", source: "Buhari, Müslim" },
+      { text: "Mümin, aynı delikten iki kez sokulmaz.", source: "Buhari, Müslim" },
+      { text: "Mümin, başkalarıyla iyi geçinen ve kendisiyle iyi geçinilen kimsedir.", source: "Tirmizi" },
+      { text: "Allah'ın en çok sevdiği kul, ailesine en çok faydalı olandır.", source: "Tirmizi" },
+      { text: "En hayırlınız, Kur'an'ı öğrenen ve öğretendir.", source: "Buhari" },
+      { text: "İnsanların en hayırlısı, ömrü uzun, ameli güzel olandır.", source: "Tirmizi" },
+      { text: "Allah, sizin bedenlerinize ve suretlerinize bakmaz, kalplerinize ve amellerinize bakar.", source: "Müslim" },
+      { text: "Mümin, mümine karşı bir binanın tuğlaları gibidir.", source: "Buhari" },
+      { text: "İman yetmiş küsur şubedir. Haya da imanın bir şubesidir.", source: "Buhari, Müslim" },
+      { text: "Allah'ın en çok sevdiği amel, az da olsa devamlı olanıdır.", source: "Buhari, Müslim" },
+      { text: "Mümin, mümine karşı bir binanın tuğlaları gibidir. Birbirini sıkıca tutar.", source: "Buhari" },
+      { text: "Sizden biriniz, kendisi için istediğini kardeşi için de istemedikçe gerçek anlamda iman etmiş olmaz.", source: "Buhari, Müslim" },
+      { text: "Allah, sizin dış görünüşünüze ve mallarınıza bakmaz. O, kalplerinize ve amellerinize bakar.", source: "Müslim" },
+      { text: "İnsanların en hayırlısı, insanlara en çok faydalı olandır.", source: "Taberani" },
+      { text: "Kolaylaştırın, zorlaştırmayın. Müjdeleyin, nefret ettirmeyin.", source: "Buhari" },
+      { text: "Allah'ın rızası, anne-babanın rızasındadır. Allah'ın gazabı da anne-babanın gazabındadır.", source: "Tirmizi" },
+      { text: "Temizlik imanın yarısıdır.", source: "Müslim" },
+    ],
+    en: [
+      { text: "The most beloved deed to Allah is the one that is consistent, even if it is small.", source: "Bukhari, Muslim" },
+      { text: "Faith has over seventy branches. The highest is saying 'La ilaha illallah' and the lowest is removing something harmful from the road.", source: "Bukhari, Muslim" },
+      { text: "A believer to another believer is like a building whose different parts enforce each other.", source: "Bukhari" },
+      { text: "None of you truly believes until he wishes for his brother what he wishes for himself.", source: "Bukhari, Muslim" },
+      { text: "Allah does not look at your appearance or your wealth, but He looks at your hearts and your deeds.", source: "Muslim" },
+      { text: "The best of people are those who are most beneficial to others.", source: "Tabarani" },
+      { text: "Make things easy, do not make them difficult. Give glad tidings, do not repel people.", source: "Bukhari" },
+      { text: "Allah's pleasure is in the pleasure of parents, and Allah's displeasure is in the displeasure of parents.", source: "Tirmidhi" },
+      { text: "Cleanliness is half of faith.", source: "Muslim" },
+      { text: "Patience is half of faith.", source: "Tirmidhi" },
+      { text: "Seeking knowledge is obligatory upon every Muslim, male and female.", source: "Ibn Majah" },
+      { text: "Judging justly between two people is charity.", source: "Bukhari, Muslim" },
+      { text: "A good word is charity.", source: "Bukhari, Muslim" },
+      { text: "Removing something harmful from the road is charity.", source: "Bukhari, Muslim" },
+      { text: "A believer is not stung from the same hole twice.", source: "Bukhari, Muslim" },
+      { text: "A believer is one who gets along with others and others get along with him.", source: "Tirmidhi" },
+      { text: "The most beloved of people to Allah is the one who is most beneficial to his family.", source: "Tirmidhi" },
+      { text: "The best among you are those who learn the Quran and teach it.", source: "Bukhari" },
+      { text: "The best of people are those whose lives are long and whose deeds are good.", source: "Tirmidhi" },
+      { text: "Allah does not look at your bodies or your appearances, but He looks at your hearts and your deeds.", source: "Muslim" },
+      { text: "A believer to another believer is like a building whose different parts enforce each other.", source: "Bukhari" },
+      { text: "Faith has over seventy branches. Modesty is a branch of faith.", source: "Bukhari, Muslim" },
+      { text: "The most beloved deed to Allah is the one that is consistent, even if it is small.", source: "Bukhari, Muslim" },
+      { text: "A believer to another believer is like a building whose different parts enforce each other.", source: "Bukhari" },
+      { text: "None of you truly believes until he wishes for his brother what he wishes for himself.", source: "Bukhari, Muslim" },
+      { text: "Allah does not look at your appearance or your wealth, but He looks at your hearts and your deeds.", source: "Muslim" },
+      { text: "The best of people are those who are most beneficial to others.", source: "Tabarani" },
+      { text: "Make things easy, do not make them difficult. Give glad tidings, do not repel people.", source: "Bukhari" },
+      { text: "Allah's pleasure is in the pleasure of parents, and Allah's displeasure is in the displeasure of parents.", source: "Tirmidhi" },
+      { text: "Cleanliness is half of faith.", source: "Muslim" },
+    ],
+    ar: [
+      { text: "أَحَبُّ الأَعْمَالِ إِلَى اللَّهِ أَدْوَمُهَا وَإِنْ قَلَّ", source: "البخاري ومسلم" },
+      { text: "الإِيمَانُ بِضْعٌ وَسَبْعُونَ شُعْبَةً، أَعْلاهَا قَوْلُ لا إِلَهَ إِلا اللَّهُ، وَأَدْنَاهَا إِمَاطَةُ الأَذَى عَنِ الطَّرِيقِ", source: "البخاري ومسلم" },
+      { text: "الْمُؤْمِنُ لِلْمُؤْمِنِ كَالْبُنْيَانِ يَشُدُّ بَعْضُهُ بَعْضًا", source: "البخاري" },
+      { text: "لا يُؤْمِنُ أَحَدُكُمْ حَتَّى يُحِبَّ لأَخِيهِ مَا يُحِبُّ لِنَفْسِهِ", source: "البخاري ومسلم" },
+      { text: "إِنَّ اللَّهَ لا يَنْظُرُ إِلَى صُوَرِكُمْ وَأَمْوَالِكُمْ وَلَكِنْ يَنْظُرُ إِلَى قُلُوبِكُمْ وَأَعْمَالِكُمْ", source: "مسلم" },
+      { text: "خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ", source: "الطبراني" },
+      { text: "يَسِّرُوا وَلا تُعَسِّرُوا، وَبَشِّرُوا وَلا تُنَفِّرُوا", source: "البخاري" },
+      { text: "رِضَا اللَّهِ فِي رِضَا الْوَالِدَيْنِ، وَسَخَطُ اللَّهِ فِي سَخَطِ الْوَالِدَيْنِ", source: "الترمذي" },
+      { text: "الطُّهُورُ شَطْرُ الإِيمَانِ", source: "مسلم" },
+      { text: "الصَّبْرُ شَطْرُ الإِيمَانِ", source: "الترمذي" },
+      { text: "طَلَبُ الْعِلْمِ فَرِيضَةٌ عَلَى كُلِّ مُسْلِمٍ", source: "ابن ماجه" },
+      { text: "الْعَدْلُ بَيْنَ اثْنَيْنِ صَدَقَةٌ", source: "البخاري ومسلم" },
+      { text: "الْكَلِمَةُ الطَّيِّبَةُ صَدَقَةٌ", source: "البخاري ومسلم" },
+      { text: "إِمَاطَةُ الأَذَى عَنِ الطَّرِيقِ صَدَقَةٌ", source: "البخاري ومسلم" },
+      { text: "لا يُلْدَغُ الْمُؤْمِنُ مِنْ جُحْرٍ وَاحِدٍ مَرَّتَيْنِ", source: "البخاري ومسلم" },
+      { text: "الْمُؤْمِنُ مَنْ أَمِنَهُ النَّاسُ عَلَى أَمْوَالِهِمْ وَأَنْفُسِهِمْ", source: "الترمذي" },
+      { text: "أَحَبُّ النَّاسِ إِلَى اللَّهِ أَنْفَعُهُمْ لِأَهْلِهِ", source: "الترمذي" },
+      { text: "خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ", source: "البخاري" },
+      { text: "خَيْرُ النَّاسِ مَنْ طَالَ عُمُرُهُ وَحَسُنَ عَمَلُهُ", source: "الترمذي" },
+      { text: "إِنَّ اللَّهَ لا يَنْظُرُ إِلَى أَجْسَامِكُمْ وَلا إِلَى صُوَرِكُمْ وَلَكِنْ يَنْظُرُ إِلَى قُلُوبِكُمْ وَأَعْمَالِكُمْ", source: "مسلم" },
+      { text: "الْمُؤْمِنُ لِلْمُؤْمِنِ كَالْبُنْيَانِ يَشُدُّ بَعْضُهُ بَعْضًا", source: "البخاري" },
+      { text: "الإِيمَانُ بِضْعٌ وَسَبْعُونَ شُعْبَةً، وَالْحَيَاءُ شُعْبَةٌ مِنَ الإِيمَانِ", source: "البخاري ومسلم" },
+      { text: "أَحَبُّ الأَعْمَالِ إِلَى اللَّهِ أَدْوَمُهَا وَإِنْ قَلَّ", source: "البخاري ومسلم" },
+      { text: "الْمُؤْمِنُ لِلْمُؤْمِنِ كَالْبُنْيَانِ يَشُدُّ بَعْضُهُ بَعْضًا", source: "البخاري" },
+      { text: "لا يُؤْمِنُ أَحَدُكُمْ حَتَّى يُحِبَّ لأَخِيهِ مَا يُحِبُّ لِنَفْسِهِ", source: "البخاري ومسلم" },
+      { text: "إِنَّ اللَّهَ لا يَنْظُرُ إِلَى صُوَرِكُمْ وَأَمْوَالِكُمْ وَلَكِنْ يَنْظُرُ إِلَى قُلُوبِكُمْ وَأَعْمَالِكُمْ", source: "مسلم" },
+      { text: "خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ", source: "الطبراني" },
+      { text: "يَسِّرُوا وَلا تُعَسِّرُوا، وَبَشِّرُوا وَلا تُنَفِّرُوا", source: "البخاري" },
+      { text: "رِضَا اللَّهِ فِي رِضَا الْوَالِدَيْنِ، وَسَخَطُ اللَّهِ فِي سَخَطِ الْوَالِدَيْنِ", source: "الترمذي" },
+      { text: "الطُّهُورُ شَطْرُ الإِيمَانِ", source: "مسلم" },
+    ],
+  };
   
-  // 365 hadis için döngü oluştur (30 hadisi tekrarlayarak)
-  const hadithIndex = (dayOfYear - 1) % hadiths.length;
-  return hadiths[hadithIndex];
+  const currentHadiths = hadiths[language] || hadiths.tr;
+  const hadithIndex = (dayOfYear - 1) % currentHadiths.length;
+  return currentHadiths[hadithIndex];
 };
 
 // Başarımlar Tanımları
@@ -366,18 +859,29 @@ const Tab = createBottomTabNavigator();
 function HomeScreen({ navigation }) {
   const [customZikirs, setCustomZikirs] = useState([]);
   const [newZikirName, setNewZikirName] = useState('');
+  const [newZikirArabic, setNewZikirArabic] = useState('');
   const [showAddZikir, setShowAddZikir] = useState(false);
   const db = useDatabase();
   const themeContext = useTheme();
   const theme = themeContext?.theme || 'dark';
   const themeThemes = themeContext?.themes || themes;
   const themeColors = themeThemes[theme]?.colors || themeThemes.dark?.colors || themes.dark.colors;
+  const { language, t, setLanguage } = useLanguage();
 
   useEffect(() => {
     if (db) {
       loadCustomZikirs(db);
     }
   }, [db]);
+
+  // Tab'a her gidildiğinde verileri yeniden yükle
+  useFocusEffect(
+    React.useCallback(() => {
+      if (db) {
+        loadCustomZikirs(db);
+      }
+    }, [db])
+  );
 
   const loadCustomZikirs = async (database) => {
     try {
@@ -390,30 +894,42 @@ function HomeScreen({ navigation }) {
 
   const createCustomZikir = async () => {
     if (!newZikirName.trim() || !db) {
-      Alert.alert('Hata', 'Lütfen bir zikir adı girin');
+      Alert.alert(t.error, t.enterZikirName);
       return;
     }
 
     try {
+      // Önce tabloda arabic kolonu var mı kontrol et, yoksa ekle
+      try {
+        await db.execAsync('ALTER TABLE custom_zikirs ADD COLUMN arabic TEXT;');
+      } catch (error) {
+        // Kolon zaten varsa hata vermez, devam et
+        if (!error.message || !error.message.includes('duplicate column')) {
+          console.log('Arabic kolonu eklenirken hata (muhtemelen zaten var):', error);
+        }
+      }
+
       const result = await db.runAsync(
-        'INSERT INTO custom_zikirs (name) VALUES (?);',
-        [newZikirName.trim()]
+        'INSERT INTO custom_zikirs (name, arabic) VALUES (?, ?);',
+        [newZikirName.trim(), newZikirArabic.trim() || null]
       );
       const newZikir = {
         id: result.lastInsertRowId,
         name: newZikirName.trim(),
+        arabic: newZikirArabic.trim() || null,
         type: 'custom',
         created_at: new Date().toISOString(),
       };
       setCustomZikirs([newZikir, ...customZikirs]);
       setNewZikirName('');
+      setNewZikirArabic('');
       setShowAddZikir(false);
-      Alert.alert('Başarılı', 'Özel zikir eklendi');
+      Alert.alert(t.success, t.customZikirAdded);
     } catch (error) {
       if (error.message && error.message.includes('UNIQUE constraint')) {
-        Alert.alert('Hata', 'Bu zikir adı zaten kullanılıyor');
+        Alert.alert(t.error, t.customZikirExists);
       } else {
-        Alert.alert('Hata', 'Zikir eklenemedi');
+        Alert.alert(t.error, t.customZikirNotAdded);
       }
     }
   };
@@ -422,12 +938,72 @@ function HomeScreen({ navigation }) {
     navigation.navigate('Counter', { zikir });
   };
 
+  const deleteCustomZikir = async (zikirId, zikirName) => {
+    Alert.alert(
+      t.deleteCustomZikir,
+      `"${zikirName}" ${t.deleteCustomZikirConfirm}`,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.delete,
+          style: 'destructive',
+          onPress: async () => {
+            if (!db) return;
+            try {
+              // Özel zikiri sil
+              await db.runAsync('DELETE FROM custom_zikirs WHERE id = ?;', [zikirId]);
+              
+              // İlgili zikir kayıtlarını sil
+              await db.runAsync(
+                'DELETE FROM zikir_records WHERE zikir_id = ? AND zikir_type = ?;',
+                [zikirId, 'custom']
+              );
+              
+              // İlgili zikir hedeflerini sil
+              await db.runAsync(
+                'DELETE FROM zikir_targets WHERE zikir_id = ? AND zikir_type = ?;',
+                [zikirId, 'custom']
+              );
+              
+              // Listeyi güncelle
+              await loadCustomZikirs(db);
+              
+              safeNotificationAsync('Success');
+              Alert.alert(t.success, t.customZikirDeleted);
+            } catch (error) {
+              console.error('Özel zikir silme hatası:', error);
+              Alert.alert(t.error, t.customZikirNotDeleted);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <StatusBar style="light" />
       <View style={[styles.header, { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
-        <Text style={[styles.headerTitle, { color: themeColors.text }]}>Zikir Sayacı</Text>
-        <Text style={[styles.headerSubtitle, { color: themeColors.textMuted }]}>Zikir Seçin</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.headerAccent, { backgroundColor: themeColors.primary }]} />
+            <Text style={[styles.headerTitle, { color: themeColors.text }]}>{t.appName}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.languageSelector, { borderColor: themeColors.primary }]}
+            onPress={() => {
+              const languages = ['tr', 'en', 'ar'];
+              const currentIndex = languages.indexOf(language);
+              const nextIndex = (currentIndex + 1) % languages.length;
+              setLanguage(languages[nextIndex]);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.languageText, { color: themeColors.primary }]}>
+              {language === 'tr' ? 'TR' : language === 'en' ? 'EN' : 'AR'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -440,12 +1016,25 @@ function HomeScreen({ navigation }) {
           <View style={[styles.addZikirContainer, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <TextInput
               style={[styles.input, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
-              placeholder="Özel zikir adı"
+              placeholder={t.customZikirName}
               placeholderTextColor={themeColors.textMuted}
               value={newZikirName}
               onChangeText={setNewZikirName}
-              onSubmitEditing={createCustomZikir}
+              onSubmitEditing={() => {
+                // İkinci input'a odaklan
+              }}
               autoFocus
+            />
+            <TextInput
+              style={[styles.input, styles.arabicInput, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
+              placeholder={t.arabicText}
+              placeholderTextColor={themeColors.textMuted}
+              value={newZikirArabic}
+              onChangeText={setNewZikirArabic}
+              onSubmitEditing={createCustomZikir}
+              textAlign="right"
+              textDirection="rtl"
+              textContentType="none"
             />
             <View style={styles.addZikirButtons}>
               <TouchableOpacity 
@@ -453,12 +1042,13 @@ function HomeScreen({ navigation }) {
                 onPress={() => {
                   setShowAddZikir(false);
                   setNewZikirName('');
+                  setNewZikirArabic('');
                 }}
               >
-                <Text style={[styles.cancelButtonText, { color: themeColors.text }]}>İptal</Text>
+                <Text style={[styles.cancelButtonText, { color: themeColors.text }]}>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.addButton, { backgroundColor: themeColors.primary }]} onPress={createCustomZikir}>
-                <Text style={styles.addButtonText}>Ekle</Text>
+                <Text style={styles.addButtonText}>{t.add}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -467,13 +1057,13 @@ function HomeScreen({ navigation }) {
             style={[styles.addZikirButton, { borderColor: themeColors.primary }]}
             onPress={() => setShowAddZikir(true)}
           >
-            <Text style={[styles.addZikirButtonText, { color: themeColors.primary }]}>+ Özel Zikir Ekle</Text>
+            <Text style={[styles.addZikirButtonText, { color: themeColors.primary }]}>+ {t.addCustomZikir}</Text>
           </TouchableOpacity>
         )}
 
         {/* Önerilen Zikirler */}
         <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Önerilen Zikirler</Text>
+          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{t.recommendedZikirs}</Text>
           <View style={styles.zikirGrid}>
             {ZIKIR_LIST.map((zikir) => (
               <TouchableOpacity
@@ -492,7 +1082,7 @@ function HomeScreen({ navigation }) {
         {/* Özel Zikirler */}
         {customZikirs.length > 0 && (
           <View style={styles.sectionContainer}>
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Özel Zikirler</Text>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{t.customZikir}</Text>
             <View style={styles.zikirGrid}>
               {customZikirs.map((zikir) => (
                 <TouchableOpacity
@@ -501,8 +1091,10 @@ function HomeScreen({ navigation }) {
                   onPress={() => selectZikir({ ...zikir, type: 'custom' })}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.zikirArabic, { color: themeColors.primary }]}>{zikir.name}</Text>
-                  <Text style={[styles.zikirName, { color: themeColors.textSecondary }]}>Özel</Text>
+                  {zikir.arabic ? (
+                    <Text style={[styles.zikirArabic, { color: themeColors.primary }]}>{zikir.arabic}</Text>
+                  ) : null}
+                  <Text style={[styles.zikirName, { color: themeColors.textSecondary }]}>{zikir.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -530,14 +1122,16 @@ function AnalyticsScreen() {
   const theme = themeContext?.theme || 'dark';
   const themeThemes = themeContext?.themes || themes;
   const themeColors = themeThemes[theme]?.colors || themeThemes.dark?.colors || themes.dark.colors;
+  const { t, language } = useLanguage();
 
   useEffect(() => {
     if (db) {
       loadAnalytics(db, 'daily');
       loadGeneralStats(db);
       loadDailyTrend(db);
+      loadAchievements(db);
     }
-  }, [db]);
+  }, [db, language]);
 
   // Ekrana her gidildiğinde verileri yeniden yükle
   useFocusEffect(
@@ -546,13 +1140,29 @@ function AnalyticsScreen() {
         loadAnalytics(db, selectedPeriod);
         loadGeneralStats(db);
         loadDailyTrend(db);
+        loadAchievements(db);
       }
-    }, [db, selectedPeriod])
+    }, [db, selectedPeriod, language])
   );
 
   const loadAnalytics = async (database, period) => {
     try {
+      // Default zikirleri ekle
       const allZikirs = [...ZIKIR_LIST.map(z => ({ ...z, type: 'default' }))];
+      
+      // Custom zikirleri ekle
+      try {
+        const customZikirs = await database.getAllAsync('SELECT * FROM custom_zikirs ORDER BY created_at DESC;');
+        for (const customZikir of customZikirs) {
+          allZikirs.push({
+            ...customZikir,
+            type: 'custom',
+          });
+        }
+      } catch (error) {
+        // Custom zikirler yüklenemezse devam et
+      }
+      
       const analyticsData = [];
 
       for (const zikir of allZikirs) {
@@ -667,7 +1277,7 @@ function AnalyticsScreen() {
       setGeneralStats(stats);
 
       // Başarımları kontrol et
-      checkAchievements(database, stats);
+      checkAchievements(database, stats, language);
     } catch (error) {
       console.error('Genel istatistikler yüklenirken hata:', error);
     }
@@ -679,9 +1289,11 @@ function AnalyticsScreen() {
       const unlocked = new Set(result.map(r => r.achievement_key));
       setUnlockedAchievements(unlocked);
       
-      // Tüm başarımları listele
+      // Tüm başarımları listele (dil desteği ile)
       const allAchievements = Object.values(ACHIEVEMENTS).map(achievement => ({
         ...achievement,
+        title: t[`achievement_${achievement.key}_title`] || achievement.title,
+        description: t[`achievement_${achievement.key}_desc`] || achievement.description,
         unlocked: unlocked.has(achievement.key),
       }));
       setAchievements(allAchievements);
@@ -690,8 +1302,9 @@ function AnalyticsScreen() {
     }
   };
 
-  const checkAchievements = async (database, stats) => {
+  const checkAchievements = async (database, stats, currentLanguage) => {
     try {
+      const currentTranslations = translations[currentLanguage] || translations.tr;
       for (const achievement of Object.values(ACHIEVEMENTS)) {
         if (achievement.condition(stats)) {
           // Başarım kazanıldı mı kontrol et
@@ -707,12 +1320,14 @@ function AnalyticsScreen() {
               [achievement.key]
             );
             
-            // Bildirim gönder
+            // Bildirim gönder (dil desteği ile)
             try {
+              const achievementTitle = currentTranslations[`achievement_${achievement.key}_title`] || achievement.title;
+              const achievementDesc = currentTranslations[`achievement_${achievement.key}_desc`] || achievement.description;
               await Notifications.scheduleNotificationAsync({
                 content: {
-                  title: `🎉 ${achievement.icon} ${achievement.title}`,
-                  body: achievement.description,
+                  title: `🎉 ${achievement.icon} ${achievementTitle}`,
+                  body: achievementDesc,
                   sound: true,
                   priority: Notifications.AndroidNotificationPriority.HIGH,
                 },
@@ -749,7 +1364,7 @@ function AnalyticsScreen() {
         const record = trendResult.find(r => r.date === dateStr);
         trendData.push({
           date: dateStr,
-          day: date.toLocaleDateString('tr-TR', { weekday: 'short' }),
+          day: date.toLocaleDateString(language === 'tr' ? 'tr-TR' : language === 'en' ? 'en-US' : 'ar-SA', { weekday: 'short' }),
           total: record ? record.total : 0,
         });
       }
@@ -797,15 +1412,15 @@ function AnalyticsScreen() {
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <StatusBar style="light" />
       <View style={[styles.header, { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
-        <Text style={[styles.headerTitle, { color: themeColors.text }]}>Analiz</Text>
+        <Text style={[styles.headerTitle, { color: themeColors.text }]}>{t.analytics}</Text>
         <View style={styles.headerRight}>
-          <Text style={[styles.headerSubtitle, { color: themeColors.textMuted }]}>Zikir İstatistikleri</Text>
+          <Text style={[styles.headerSubtitle, { color: themeColors.textMuted }]}>{t.zikirStatistics}</Text>
           <TouchableOpacity
             style={[styles.historyButton, { backgroundColor: showHistory ? themeColors.primary : themeColors.background, borderColor: themeColors.border }]}
             onPress={toggleHistory}
           >
             <Text style={[styles.historyButtonText, { color: showHistory ? '#ffffff' : themeColors.text }]}>
-              {showHistory ? '📊 İstatistikler' : '📅 Geçmiş'}
+              {showHistory ? `📊 ${t.statistics}` : `📅 ${t.history}`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -821,7 +1436,7 @@ function AnalyticsScreen() {
           onPress={() => handlePeriodChange('daily')}
         >
           <Text style={[styles.periodButtonText, { color: selectedPeriod === 'daily' ? '#ffffff' : themeColors.textMuted }]}>
-            Günlük
+            {t.daily}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -832,7 +1447,7 @@ function AnalyticsScreen() {
           onPress={() => handlePeriodChange('weekly')}
         >
           <Text style={[styles.periodButtonText, { color: selectedPeriod === 'weekly' ? '#ffffff' : themeColors.textMuted }]}>
-            Haftalık
+            {t.weekly}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -843,7 +1458,7 @@ function AnalyticsScreen() {
           onPress={() => handlePeriodChange('monthly')}
         >
           <Text style={[styles.periodButtonText, { color: selectedPeriod === 'monthly' ? '#ffffff' : themeColors.textMuted }]}>
-            Aylık
+            {t.monthly}
           </Text>
         </TouchableOpacity>
       </View>
@@ -852,26 +1467,26 @@ function AnalyticsScreen() {
         {/* Zikir Geçmişi */}
         {showHistory ? (
           <View style={[styles.historyCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-            <Text style={[styles.historyTitle, { color: themeColors.text }]}>Son 30 Gün Geçmişi</Text>
+            <Text style={[styles.historyTitle, { color: themeColors.text }]}>{language === 'tr' ? 'Son 30 Gün Geçmişi' : language === 'en' ? 'Last 30 Days History' : 'سجل آخر 30 يوم'}</Text>
             {historyData.length > 0 ? (
               historyData.map((day, index) => (
                 <View key={index} style={[styles.historyItem, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
                   <View style={styles.historyItemLeft}>
                     <Text style={[styles.historyDate, { color: themeColors.text }]}>
-                      {new Date(day.date + 'T00:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {new Date(day.date + 'T00:00:00').toLocaleDateString(language === 'tr' ? 'tr-TR' : language === 'en' ? 'en-US' : 'ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </Text>
                     <Text style={[styles.historyZikirCount, { color: themeColors.textMuted }]}>
-                      {day.zikir_count} zikir türü
+                      {day.zikir_count} {language === 'tr' ? 'zikir türü' : language === 'en' ? 'dhikr types' : 'أنواع الذكر'}
                     </Text>
                   </View>
                   <Text style={[styles.historyTotal, { color: themeColors.primary }]}>
-                    {day.total} zikir
+                    {day.total} {t.zikir}
                   </Text>
                 </View>
               ))
             ) : (
               <Text style={[styles.historyEmpty, { color: themeColors.textMuted }]}>
-                Henüz geçmiş veri yok
+                {language === 'tr' ? 'Henüz geçmiş veri yok' : language === 'en' ? 'No history data yet' : 'لا توجد بيانات سابقة بعد'}
               </Text>
             )}
           </View>
@@ -882,16 +1497,16 @@ function AnalyticsScreen() {
           <View style={[styles.hadithCard, { backgroundColor: themeColors.surface, borderColor: themeColors.primary }]}>
             <View style={styles.hadithHeader}>
               <Text style={styles.hadithIcon}>📖</Text>
-              <Text style={[styles.hadithTitle, { color: themeColors.primary }]}>Günün Hadisi</Text>
+              <Text style={[styles.hadithTitle, { color: themeColors.primary }]}>{t.dailyHadith}</Text>
             </View>
             <Text style={[styles.hadithText, { color: themeColors.text }]}>
-              "{getDailyHadith().text}"
+              "{getDailyHadith(language).text}"
             </Text>
             <Text style={[styles.hadithSource, { color: themeColors.textMuted }]}>
-              — {getDailyHadith().source}
+              — {getDailyHadith(language).source}
             </Text>
             <Text style={[styles.hadithDay, { color: themeColors.textMuted }]}>
-              {generalStats.streak} günlük seri devam ediyor 🔥
+              {generalStats.streak} {language === 'tr' ? 'günlük seri devam ediyor' : language === 'en' ? 'day streak continues' : 'يوم متتالي مستمر'} 🔥
             </Text>
           </View>
         )}
@@ -899,19 +1514,19 @@ function AnalyticsScreen() {
         {/* Genel İstatistikler */}
             {generalStats && (
           <View style={[styles.statsOverviewCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-            <Text style={[styles.statsOverviewTitle, { color: themeColors.text }]}>Genel İstatistikler</Text>
+            <Text style={[styles.statsOverviewTitle, { color: themeColors.text }]}>{t.generalStatistics}</Text>
             <View style={styles.statsOverviewGrid}>
               <View style={styles.statsOverviewItem}>
                 <Text style={[styles.statsOverviewValue, { color: themeColors.primary }]}>
                   {generalStats.total.toLocaleString()}
                 </Text>
-                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>Toplam Zikir</Text>
+                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>{t.total} {t.zikir}</Text>
               </View>
               <View style={styles.statsOverviewItem}>
                 <Text style={[styles.statsOverviewValue, { color: themeColors.primary }]}>
                   {generalStats.avgDaily}
                 </Text>
-                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>Ortalama Günlük</Text>
+                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>{t.avgDaily}</Text>
               </View>
               <View style={styles.statsOverviewItem}>
                 <View style={styles.streakContainer}>
@@ -920,7 +1535,7 @@ function AnalyticsScreen() {
                     {generalStats.streak}
                   </Text>
                 </View>
-                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>Günlük Seri</Text>
+                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>{t.dailyStreak}</Text>
                 {generalStats.streak > 0 && (
                   <Text style={[styles.streakMessage, { color: themeColors.primary }]}>
                     {generalStats.streak >= 30 ? '💪 Efsane!' : generalStats.streak >= 7 ? '🔥 Harika!' : '✨ Devam!'}
@@ -931,14 +1546,14 @@ function AnalyticsScreen() {
                 <Text style={[styles.statsOverviewValue, { color: themeColors.primary }]}>
                   {generalStats.completedTargets}
                 </Text>
-                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>Hedef Tamamlandı</Text>
+                <Text style={[styles.statsOverviewLabel, { color: themeColors.textMuted }]}>{t.targetCompleted}</Text>
               </View>
             </View>
             {generalStats.bestDay && (
               <View style={styles.bestDayContainer}>
-                <Text style={[styles.bestDayLabel, { color: themeColors.textMuted }]}>En İyi Gün</Text>
+                <Text style={[styles.bestDayLabel, { color: themeColors.textMuted }]}>{t.bestDay}</Text>
                 <Text style={[styles.bestDayValue, { color: themeColors.text }]}>
-                  {new Date(generalStats.bestDay.date + 'T00:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} - {generalStats.bestDay.total} zikir
+                  {new Date(generalStats.bestDay.date + 'T00:00:00').toLocaleDateString(language === 'tr' ? 'tr-TR' : language === 'en' ? 'en-US' : 'ar-SA', { day: 'numeric', month: 'long' })} - {generalStats.bestDay.total} {t.zikir}
                 </Text>
               </View>
             )}
@@ -948,7 +1563,7 @@ function AnalyticsScreen() {
         {/* Günlük Trend Grafiği */}
         {dailyTrend.length > 0 && selectedPeriod === 'daily' && (
           <View style={[styles.trendCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-            <Text style={[styles.trendCardTitle, { color: themeColors.text }]}>Son 7 Gün Trendi</Text>
+            <Text style={[styles.trendCardTitle, { color: themeColors.text }]}>{t.last7DaysTrend}</Text>
             <View style={styles.trendChart}>
               {dailyTrend.map((day, index) => (
                 <View key={index} style={styles.trendBarContainer}>
@@ -979,9 +1594,9 @@ function AnalyticsScreen() {
         {/* Başarı Rozetleri */}
         {achievements.length > 0 && (
           <View style={[styles.achievementsCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-            <Text style={[styles.achievementsTitle, { color: themeColors.text }]}>Başarı Rozetleri</Text>
+            <Text style={[styles.achievementsTitle, { color: themeColors.text }]}>{t.achievements}</Text>
             <Text style={[styles.achievementsSubtitle, { color: themeColors.textMuted }]}>
-              {achievements.filter(a => a.unlocked).length} / {achievements.length} kazanıldı
+              {achievements.filter(a => a.unlocked).length} / {achievements.length} {t.achievementsUnlocked}
             </Text>
             <View style={styles.achievementsGrid}>
               {achievements.map((achievement) => (
@@ -1013,13 +1628,15 @@ function AnalyticsScreen() {
             </View>
           </View>
         )}
+          </>
+        )}
 
         {/* Zikir Listesi */}
         {currentData.length > 0 && (
           <>
             <View style={styles.analyticsListHeader}>
               <Text style={[styles.analyticsListTitle, { color: themeColors.text }]}>
-                {selectedPeriod === 'daily' ? 'Bugün' : selectedPeriod === 'weekly' ? 'Bu Hafta' : 'Bu Ay'}
+                {selectedPeriod === 'daily' ? t.today : selectedPeriod === 'weekly' ? t.thisWeek : t.thisMonth}
               </Text>
             </View>
             {currentData.map((item) => (
@@ -1051,8 +1668,6 @@ function AnalyticsScreen() {
             ))}
           </>
         )}
-          </>
-        )}
       </ScrollView>
     </View>
   );
@@ -1066,11 +1681,59 @@ function CounterScreen({ route, navigation }) {
   const theme = themeContext?.theme || 'dark';
   const themeThemes = themeContext?.themes || themes;
   const themeColors = themeThemes[theme]?.colors || themeThemes.dark?.colors || themes.dark.colors;
+  const { language, t } = useLanguage();
   const [zikirCount, setZikirCount] = useState(0);
   const [zikirTarget, setZikirTarget] = useState(0);
   const [showSetTarget, setShowSetTarget] = useState(false);
   const [newTarget, setNewTarget] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
+
+  const deleteCustomZikir = async () => {
+    if (!zikir || zikir.type !== 'custom' || !db) return;
+    
+    Alert.alert(
+      'Özel Zikiri Sil',
+      `"${zikir.name}" zikiri silinecek. Bu işlem geri alınamaz. Emin misiniz?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const zikirId = zikir.id;
+              
+              // Özel zikiri sil
+              await db.runAsync('DELETE FROM custom_zikirs WHERE id = ?;', [zikirId]);
+              
+              // İlgili zikir kayıtlarını sil
+              await db.runAsync(
+                'DELETE FROM zikir_records WHERE zikir_id = ? AND zikir_type = ?;',
+                [zikirId, 'custom']
+              );
+              
+              // İlgili zikir hedeflerini sil
+              await db.runAsync(
+                'DELETE FROM zikir_targets WHERE zikir_id = ? AND zikir_type = ?;',
+                [zikirId, 'custom']
+              );
+              
+              safeNotificationAsync('Success');
+              Alert.alert('Başarılı', 'Özel zikir silindi', [
+                {
+                  text: 'Tamam',
+                  onPress: () => navigation.goBack(),
+                },
+              ]);
+            } catch (error) {
+              console.error('Özel zikir silme hatası:', error);
+              Alert.alert('Hata', 'Özel zikir silinemedi');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (zikir && db) {
@@ -1119,17 +1782,34 @@ function CounterScreen({ route, navigation }) {
         [zikirId, zikirType]
       );
       
-      // Default hedef 100 - eğer yoksa oluştur
-      let target = 100;
+      // Önce settings'ten varsayılan hedefi oku
+      let defaultTargetValue = 100;
+      try {
+        const defaultTargetResult = await db.getAllAsync(
+          'SELECT value FROM settings WHERE key = ?;',
+          ['defaultTarget']
+        );
+        if (defaultTargetResult.length > 0) {
+          defaultTargetValue = parseInt(defaultTargetResult[0].value) || 100;
+        }
+      } catch (error) {
+        console.error('Varsayılan hedef okuma hatası:', error);
+      }
+      
+      // Eğer zikir için hedef varsa onu kullan, yoksa varsayılan hedefi kullan
+      let target = defaultTargetValue;
       if (targetResult.length > 0) {
-        target = targetResult[0].target || 100;
+        const dbTarget = targetResult[0].target;
+        // Veritabanından gelen değeri kullan, eğer null veya 0 ise varsayılan hedefi kullan
+        target = (dbTarget != null && dbTarget !== 0) ? Number(dbTarget) : defaultTargetValue;
       } else {
-        // İlk kez açılıyorsa default hedefi kaydet
+        // İlk kez açılıyorsa varsayılan hedefi kaydet
         try {
           await db.runAsync(
             'INSERT INTO zikir_targets (zikir_id, zikir_type, target) VALUES (?, ?, ?);',
-            [zikirId, zikirType, 100]
+            [zikirId, zikirType, defaultTargetValue]
           );
+          target = defaultTargetValue;
         } catch (error) {
           console.error('Default hedef kaydetme hatası:', error);
         }
@@ -1169,7 +1849,7 @@ function CounterScreen({ route, navigation }) {
       }
       
       setZikirCount(newCount);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      safeImpactAsync('Light');
       
       // Hedefe ulaşıldığında bildirim gönder ve animasyon göster (sadece bir kez)
       if (newCount === target) {
@@ -1190,11 +1870,11 @@ function CounterScreen({ route, navigation }) {
             },
             trigger: null, // Hemen gönder (local notification)
           });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          safeNotificationAsync('Success');
         } catch (error) {
           // Expo Go'da bazı bildirim özellikleri sınırlı olabilir
           // Hata olsa bile haptic feedback gönder
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          safeNotificationAsync('Success');
         }
       }
     } catch (error) {
@@ -1206,12 +1886,12 @@ function CounterScreen({ route, navigation }) {
     if (!zikir || !db) return;
 
     Alert.alert(
-      'Sıfırla',
-      'Sayacı sıfırlamak istediğinize emin misiniz?',
+      t.reset,
+      language === 'tr' ? 'Sayacı sıfırlamak istediğinize emin misiniz?' : language === 'en' ? 'Are you sure you want to reset the counter?' : 'هل أنت متأكد أنك تريد إعادة تعيين العداد؟',
       [
-        { text: 'İptal', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: 'Sıfırla',
+          text: t.reset,
           style: 'destructive',
           onPress: async () => {
             try {
@@ -1223,7 +1903,7 @@ function CounterScreen({ route, navigation }) {
                 [zikirId, zikirType]
               );
               setZikirCount(0);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              safeNotificationAsync('Success');
             } catch (error) {
               console.error('Sıfırlama hatası:', error);
             }
@@ -1238,7 +1918,7 @@ function CounterScreen({ route, navigation }) {
     
     const targetValue = parseInt(newTarget);
     if (isNaN(targetValue) || targetValue < 0) {
-      Alert.alert('Hata', 'Lütfen geçerli bir sayı girin');
+      Alert.alert(t.error, language === 'tr' ? 'Lütfen geçerli bir sayı girin' : language === 'en' ? 'Please enter a valid number' : 'الرجاء إدخال رقم صحيح');
       return;
     }
 
@@ -1268,7 +1948,7 @@ function CounterScreen({ route, navigation }) {
       setZikirTarget(targetValue);
       setNewTarget('');
       setShowSetTarget(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeNotificationAsync('Success');
     } catch (error) {
       console.error('Hedef kaydetme hatası:', error);
       Alert.alert('Hata', 'Hedef kaydedilemedi');
@@ -1291,17 +1971,27 @@ function CounterScreen({ route, navigation }) {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            safeImpactAsync('Light');
             navigation.goBack();
           }}
           activeOpacity={0.7}
         >
-          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>‹ Geri</Text>
+          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>‹ {t.back}</Text>
         </TouchableOpacity>
         <Text style={[styles.counterUserName, { color: themeColors.text }]} numberOfLines={1}>
           {zikir.name}
         </Text>
-        <View style={styles.placeholder} />
+        {zikir.type === 'custom' ? (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={deleteCustomZikir}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.deleteButtonText, { color: '#ef4444' }]}>🗑️</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       <ScrollView
@@ -1317,14 +2007,14 @@ function CounterScreen({ route, navigation }) {
               </View>
             ) : null}
             <View style={styles.nameContainer}>
-              <Text style={[styles.zikirNameLabel, { color: themeColors.textMuted }]}>Zikir</Text>
+              <Text style={[styles.zikirNameLabel, { color: themeColors.textMuted }]}>{t.zikir}</Text>
               <Text style={[styles.zikirNameLarge, { color: themeColors.text }]}>{zikir.name}</Text>
             </View>
           </View>
 
           <View style={[styles.countCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <View style={styles.countHeader}>
-              <Text style={[styles.counterLabel, { color: themeColors.textMuted }]}>Bugünkü Zikir</Text>
+              <Text style={[styles.counterLabel, { color: themeColors.textMuted }]}>{t.today}</Text>
               <Text style={[styles.dateText, { color: themeColors.textMuted }]}>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}</Text>
             </View>
             <Text style={[styles.counterNumber, { color: themeColors.primary }]}>{zikirCount}</Text>
@@ -1332,7 +2022,7 @@ function CounterScreen({ route, navigation }) {
 
           <View style={[styles.statsCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: themeColors.textMuted }]}>Toplam</Text>
+              <Text style={[styles.statLabel, { color: themeColors.textMuted }]}>{t.total}</Text>
               <Text style={[styles.statValue, { color: themeColors.text }]}>{zikirCount}</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: themeColors.border }]} />
@@ -1343,7 +2033,7 @@ function CounterScreen({ route, navigation }) {
                 setShowSetTarget(true);
               }}
             >
-              <Text style={[styles.statLabel, { color: themeColors.textMuted }]}>Hedef</Text>
+              <Text style={[styles.statLabel, { color: themeColors.textMuted }]}>{t.target}</Text>
               <Text style={[styles.statValue, { color: themeColors.text }]}>
                 {zikirTarget || 100}
               </Text>
@@ -1352,7 +2042,7 @@ function CounterScreen({ route, navigation }) {
 
           <View style={[styles.progressCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <View style={styles.progressHeader}>
-              <Text style={[styles.progressLabel, { color: themeColors.textMuted }]}>İlerleme</Text>
+              <Text style={[styles.progressLabel, { color: themeColors.textMuted }]}>{t.progress}</Text>
               <Text style={[styles.progressText, { color: themeColors.text }]}>
                 {zikirCount} / {zikirTarget || 100}
               </Text>
@@ -1375,7 +2065,7 @@ function CounterScreen({ route, navigation }) {
               {(() => {
                 const progressPercentage = Math.round((zikirCount / (zikirTarget || 100)) * 100);
                 const isTargetReached = zikirCount >= (zikirTarget || 100);
-                return isTargetReached ? '100% ✓ Tamamlandı!' : `${progressPercentage}%`;
+                return isTargetReached ? `100% ✓ ${t.completed}` : `${progressPercentage}%`;
               })()}
             </Text>
             {/* Motivasyon Mesajları */}
@@ -1384,20 +2074,52 @@ function CounterScreen({ route, navigation }) {
               const isTargetReached = zikirCount >= (zikirTarget || 100);
               let motivationMessage = '';
               
+              const motivationMessages = {
+                tr: {
+                  completed: '🎉 Harika! Hedefinize ulaştınız!',
+                  almost: '💪 Neredeyse tamamlandı! Son bir hamle!',
+                  great: '✨ Çok iyi gidiyorsunuz! Devam edin!',
+                  halfway: '🌟 Yarı yoldasınız! Güzel ilerliyorsunuz!',
+                  good: '🌱 Başlangıç güzel! Devam edin!',
+                  started: '🌿 İyi başlangıç! Her adım önemli!',
+                  begin: '🕌 Haydi başlayalım! Her zikir değerlidir!',
+                },
+                en: {
+                  completed: '🎉 Amazing! You reached your goal!',
+                  almost: '💪 Almost done! One more push!',
+                  great: '✨ You\'re doing great! Keep going!',
+                  halfway: '🌟 You\'re halfway there! Great progress!',
+                  good: '🌱 Good start! Keep it up!',
+                  started: '🌿 Good beginning! Every step matters!',
+                  begin: '🕌 Let\'s begin! Every dhikr is valuable!',
+                },
+                ar: {
+                  completed: '🎉 رائع! لقد حققت هدفك!',
+                  almost: '💪 يكاد ينتهي! دفعة واحدة أخرى!',
+                  great: '✨ أنت تبلي بلاءً حسناً! استمر!',
+                  halfway: '🌟 أنت في منتصف الطريق! تقدم رائع!',
+                  good: '🌱 بداية جيدة! استمر!',
+                  started: '🌿 بداية جيدة! كل خطوة مهمة!',
+                  begin: '🕌 هيا نبدأ! كل ذكر ثمين!',
+                },
+              };
+              
+              const messages = motivationMessages[language] || motivationMessages.tr;
+              
               if (isTargetReached) {
-                motivationMessage = '🎉 Harika! Hedefinize ulaştınız!';
+                motivationMessage = messages.completed;
               } else if (progressPercentage >= 90) {
-                motivationMessage = '💪 Neredeyse tamamlandı! Son bir hamle!';
+                motivationMessage = messages.almost;
               } else if (progressPercentage >= 75) {
-                motivationMessage = '✨ Çok iyi gidiyorsunuz! Devam edin!';
+                motivationMessage = messages.great;
               } else if (progressPercentage >= 50) {
-                motivationMessage = '🌟 Yarı yoldasınız! Güzel ilerliyorsunuz!';
+                motivationMessage = messages.halfway;
               } else if (progressPercentage >= 25) {
-                motivationMessage = '🌱 Başlangıç güzel! Devam edin!';
+                motivationMessage = messages.good;
               } else if (zikirCount > 0) {
-                motivationMessage = '🌿 İyi başlangıç! Her adım önemli!';
+                motivationMessage = messages.started;
               } else {
-                motivationMessage = '🕌 Haydi başlayalım! Her zikir değerlidir!';
+                motivationMessage = messages.begin;
               }
               
               return motivationMessage ? (
@@ -1410,10 +2132,10 @@ function CounterScreen({ route, navigation }) {
 
           {showSetTarget && (
             <View style={[styles.targetInputCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-              <Text style={[styles.targetInputLabel, { color: themeColors.text }]}>Günlük Hedef Belirle</Text>
+              <Text style={[styles.targetInputLabel, { color: themeColors.text }]}>{t.setTarget}</Text>
               <TextInput
                 style={[styles.targetInput, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
-                placeholder="Hedef sayı"
+                placeholder={t.targetPlaceholder}
                 placeholderTextColor={themeColors.textMuted}
                 value={newTarget}
                 onChangeText={setNewTarget}
@@ -1428,13 +2150,13 @@ function CounterScreen({ route, navigation }) {
                     setNewTarget('');
                   }}
                 >
-                  <Text style={[styles.cancelButtonText, { color: themeColors.text }]}>İptal</Text>
+                  <Text style={[styles.cancelButtonText, { color: themeColors.text }]}>{t.cancel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.addButton, { backgroundColor: themeColors.primary }]}
                   onPress={setTarget}
                 >
-                  <Text style={styles.addButtonText}>Kaydet</Text>
+                  <Text style={styles.addButtonText}>{t.save}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1447,9 +2169,15 @@ function CounterScreen({ route, navigation }) {
           <View style={styles.celebrationOverlay}>
             <View style={[styles.celebrationCard, { backgroundColor: themeColors.surface, borderColor: themeColors.primary }]}>
               <Text style={styles.celebrationEmoji}>🎉</Text>
-              <Text style={[styles.celebrationTitle, { color: themeColors.primary }]}>Hedef Tamamlandı!</Text>
+              <Text style={[styles.celebrationTitle, { color: themeColors.primary }]}>
+                {language === 'tr' ? 'Hedef Tamamlandı!' : language === 'en' ? 'Goal Completed!' : 'تم إكمال الهدف!'}
+              </Text>
               <Text style={[styles.celebrationMessage, { color: themeColors.text }]}>
-                {zikir.name} zikiri için günlük hedefinize ulaştınız!
+                {language === 'tr' 
+                  ? `${zikir.name} zikiri için günlük hedefinize ulaştınız!`
+                  : language === 'en'
+                  ? `You reached your daily goal for ${zikir.name} dhikr!`
+                  : `لقد حققت هدفك اليومي لذكر ${zikir.name}!`}
               </Text>
               <Text style={[styles.celebrationCount, { color: themeColors.textMuted }]}>
                 {zikirCount} / {zikirTarget || 100}
@@ -1472,7 +2200,7 @@ function CounterScreen({ route, navigation }) {
           onPress={resetZikir}
           activeOpacity={0.8}
         >
-          <Text style={[styles.resetButtonText, { color: themeColors.text }]}>Sıfırla</Text>
+          <Text style={[styles.resetButtonText, { color: themeColors.text }]}>{t.reset}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -1486,11 +2214,14 @@ function SettingsScreen() {
   const theme = themeContext?.theme || 'dark';
   const setTheme = themeContext?.setTheme || (() => {});
   const themeThemes = themeContext?.themes || themes;
+  const { language, t } = useLanguage();
   const [currentTheme, setCurrentTheme] = useState(theme);
   const [defaultTarget, setDefaultTarget] = useState('100');
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('09:00');
+  const [tempHours, setTempHours] = useState(9);
+  const [tempMinutes, setTempMinutes] = useState(0);
 
   useEffect(() => {
     if (db) {
@@ -1498,6 +2229,16 @@ function SettingsScreen() {
       loadSettings();
     }
   }, [db]);
+
+  // Tab'a her gidildiğinde ayarları yeniden yükle
+  useFocusEffect(
+    React.useCallback(() => {
+      if (db) {
+        loadTheme();
+        loadSettings();
+      }
+    }, [db, language])
+  );
 
   const loadTheme = async () => {
     if (!db) return;
@@ -1553,7 +2294,14 @@ function SettingsScreen() {
         ['reminderTime']
       );
       if (reminderTimeResult.length > 0) {
-        setReminderTime(reminderTimeResult[0].value);
+        const time = reminderTimeResult[0].value;
+        setReminderTime(time);
+        // tempHours ve tempMinutes'i güncelle
+        const timeParts = time.split(':');
+        const hours = parseInt(timeParts[0]) || 9;
+        const minutes = parseInt(timeParts[1]) || 0;
+        setTempHours(hours);
+        setTempMinutes(minutes);
       }
     } catch (error) {
       console.error('Ayarlar yüklenirken hata:', error);
@@ -1591,7 +2339,7 @@ function SettingsScreen() {
       setCurrentTheme(themeKey);
       setTheme(themeKey);
       if (hapticEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        safeNotificationAsync('Success');
       }
     } catch (error) {
       console.error('Tema kaydetme hatası:', error);
@@ -1599,17 +2347,141 @@ function SettingsScreen() {
   };
 
   const handleDefaultTargetChange = async (value) => {
+    if (!db) return;
+    
     const numValue = parseInt(value);
     if (isNaN(numValue) || numValue < 1) {
-      Alert.alert('Hata', 'Lütfen geçerli bir sayı girin (minimum 1)');
+      Alert.alert(t.error, t.enterValidNumber);
       return;
     }
-    await saveSetting('defaultTarget', numValue);
-    setDefaultTarget(value);
-    if (hapticEnabled) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    try {
+      // ÖNCE eski varsayılan hedefi oku (yeni değer kaydedilmeden önce)
+      let oldDefaultTarget = 100;
+      const oldTargetResult = await db.getAllAsync(
+        'SELECT value FROM settings WHERE key = ?;',
+        ['defaultTarget']
+      );
+      if (oldTargetResult.length > 0) {
+        oldDefaultTarget = parseInt(oldTargetResult[0].value) || 100;
+      }
+      
+      
+      // Yeni varsayılan hedefi kaydet
+      await saveSetting('defaultTarget', numValue);
+      setDefaultTarget(value);
+      
+      let updatedCount = 0;
+      
+      // Tüm default zikirler için hedefleri güncelle
+      for (const zikir of ZIKIR_LIST) {
+        const existing = await db.getAllAsync(
+          `SELECT id, target FROM zikir_targets 
+           WHERE zikir_id = ? AND zikir_type = ?
+           LIMIT 1;`,
+          [zikir.id, 'default']
+        );
+        
+        if (existing.length > 0) {
+          // Kullanıcı "tüm hepsinin güncellenmesini istiyorum" dedi
+          // Bu yüzden TÜM hedefleri güncelle
+          await db.runAsync(
+            'UPDATE zikir_targets SET target = ? WHERE id = ?;',
+            [numValue, existing[0].id]
+          );
+          updatedCount++;
+        } else {
+          // Hedef yoksa yeni varsayılan hedefi ekle
+          try {
+            await db.runAsync(
+              'INSERT INTO zikir_targets (zikir_id, zikir_type, target) VALUES (?, ?, ?);',
+              [zikir.id, 'default', numValue]
+            );
+            updatedCount++;
+          } catch (error) {
+            // Eğer UNIQUE constraint hatası varsa, UPDATE yap
+            if (error.message && error.message.includes('UNIQUE')) {
+              const existingForUpdate = await db.getAllAsync(
+                `SELECT id FROM zikir_targets 
+                 WHERE zikir_id = ? AND zikir_type = ?
+                 LIMIT 1;`,
+                [zikir.id, 'default']
+              );
+              if (existingForUpdate.length > 0) {
+                await db.runAsync(
+                  'UPDATE zikir_targets SET target = ? WHERE id = ?;',
+                  [numValue, existingForUpdate[0].id]
+                );
+                updatedCount++;
+              }
+            } else {
+              console.error(`Zikir ${zikir.id} eklenirken hata:`, error);
+            }
+          }
+        }
+      }
+      
+      // Tüm custom zikirler için hedefleri güncelle
+      const customZikirs = await db.getAllAsync('SELECT id FROM custom_zikirs;');
+      for (const zikir of customZikirs) {
+        const existing = await db.getAllAsync(
+          `SELECT id, target FROM zikir_targets 
+           WHERE zikir_id = ? AND zikir_type = ?
+           LIMIT 1;`,
+          [zikir.id, 'custom']
+        );
+        
+        if (existing.length > 0) {
+          const currentTarget = existing[0].target;
+          const targetValue = currentTarget != null ? Number(currentTarget) : null;
+          
+          // Kullanıcı "tüm hepsinin güncellenmesini istiyorum" dedi
+          // Bu yüzden TÜM custom zikir hedeflerini de güncelle
+          await db.runAsync(
+            'UPDATE zikir_targets SET target = ? WHERE id = ?;',
+            [numValue, existing[0].id]
+          );
+          updatedCount++;
+        } else {
+          // Hedef yoksa yeni varsayılan hedefi ekle
+          try {
+            await db.runAsync(
+              'INSERT INTO zikir_targets (zikir_id, zikir_type, target) VALUES (?, ?, ?);',
+              [zikir.id, 'custom', numValue]
+            );
+            updatedCount++;
+          } catch (error) {
+            // Eğer UNIQUE constraint hatası varsa, UPDATE yap
+            if (error.message && error.message.includes('UNIQUE')) {
+              const existingForUpdate = await db.getAllAsync(
+                `SELECT id FROM zikir_targets 
+                 WHERE zikir_id = ? AND zikir_type = ?
+                 LIMIT 1;`,
+                [zikir.id, 'custom']
+              );
+              if (existingForUpdate.length > 0) {
+                await db.runAsync(
+                  'UPDATE zikir_targets SET target = ? WHERE id = ?;',
+                  [numValue, existingForUpdate[0].id]
+                );
+                updatedCount++;
+              }
+            } else {
+              console.error(`Custom Zikir ${zikir.id} eklenirken hata:`, error);
+            }
+          }
+        }
+      }
+      
+      
+      if (hapticEnabled) {
+        safeNotificationAsync('Success');
+      }
+      Alert.alert(t.success, language === 'tr' ? `Varsayılan hedef kaydedildi ve ${updatedCount} zikir hedefi güncellendi` : language === 'en' ? `Default target saved and ${updatedCount} dhikr targets updated` : `تم حفظ الهدف الافتراضي وتحديث ${updatedCount} هدف ذكر`);
+    } catch (error) {
+      console.error('Varsayılan hedef güncelleme hatası:', error);
+      Alert.alert(t.error, language === 'tr' ? 'Varsayılan hedef güncellenirken bir hata oluştu' : language === 'en' ? 'An error occurred while updating default target' : 'حدث خطأ أثناء تحديث الهدف الافتراضي');
     }
-    Alert.alert('Başarılı', 'Varsayılan hedef kaydedildi');
   };
 
   const handleHapticToggle = async () => {
@@ -1617,7 +2489,7 @@ function SettingsScreen() {
     await saveSetting('hapticEnabled', newValue);
     setHapticEnabled(newValue);
     if (newValue) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeNotificationAsync('Success');
     }
   };
 
@@ -1630,73 +2502,169 @@ function SettingsScreen() {
       // Hatırlatıcıyı etkinleştir
       await scheduleDailyReminder(reminderTime);
       if (hapticEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        safeNotificationAsync('Success');
       }
     } else {
       // Tüm hatırlatıcıları iptal et
       await Notifications.cancelAllScheduledNotificationsAsync();
       if (hapticEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        safeNotificationAsync('Success');
       }
     }
   };
 
-  const handleReminderTimeChange = async () => {
-    const timeParts = reminderTime.split(':');
-    const hours = parseInt(timeParts[0]) || 9;
-    const minutes = parseInt(timeParts[1]) || 0;
-    
-    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-      Alert.alert('Hata', 'Geçerli bir saat girin (00:00 - 23:59)');
-      return;
-    }
 
-    await saveSetting('reminderTime', reminderTime);
+  const handleTimePickerConfirm = async () => {
+    const newTime = `${String(tempHours).padStart(2, '0')}:${String(tempMinutes).padStart(2, '0')}`;
+    setReminderTime(newTime);
+    
+    await saveSetting('reminderTime', newTime);
     
     if (reminderEnabled) {
-      await scheduleDailyReminder(reminderTime);
+      const notificationId = await scheduleDailyReminder(newTime);
+      
+      // Hatırlatıcının başarıyla ayarlandığını kontrol et
+      setTimeout(async () => {
+        const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+        console.log('Ayarlandı:', scheduledNotifications.length, 'bildirim');
+        
+        if (scheduledNotifications.length === 0 && notificationId) {
+          // Bildirim ayarlanmamış ama ID var - muhtemelen Expo Go sınırlaması
+          console.warn('Bildirim ID var ama listede yok - Expo Go sınırlaması olabilir');
+        }
+      }, 500);
     }
     
     if (hapticEnabled) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeNotificationAsync('Success');
     }
-    Alert.alert('Başarılı', 'Hatırlatıcı saati güncellendi');
+    
+    Alert.alert(
+      t.success, 
+      language === 'tr' 
+        ? `Hatırlatıcı ${newTime} saatine ayarlandı. Her gün bu saatte bildirim alacaksınız.` 
+        : language === 'en' 
+        ? `Reminder set to ${newTime}. You will receive a notification at this time every day.`
+        : `تم تعيين التذكير على ${newTime}. ستتلقى إشعارًا في هذا الوقت كل يوم.`
+    );
   };
 
   const scheduleDailyReminder = async (time) => {
     try {
+      // Bildirim izinlerini kontrol et ve iste
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        Alert.alert(
+          language === 'tr' ? 'Bildirim İzni Gerekli' : language === 'en' ? 'Notification Permission Required' : 'إذن الإشعار مطلوب',
+          language === 'tr' 
+            ? 'Hatırlatıcıları almak için bildirim izni vermeniz gerekiyor. Lütfen ayarlardan bildirim iznini açın.' 
+            : language === 'en' 
+            ? 'You need to grant notification permission to receive reminders. Please enable notifications in settings.'
+            : 'تحتاج إلى منح إذن الإشعار لتلقي التذكيرات. يرجى تمكين الإشعارات في الإعدادات.',
+          [{ text: language === 'tr' ? 'Tamam' : language === 'en' ? 'OK' : 'حسناً' }]
+        );
+        return;
+      }
+      
       // Önce tüm hatırlatıcıları iptal et
       await Notifications.cancelAllScheduledNotificationsAsync();
       
       const [hours, minutes] = time.split(':').map(Number);
       
       // Günlük hatırlatıcı ayarla
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '🕌 Zikir Zamanı!',
-          body: 'Günlük zikir hedefinize ulaşmak için başlayın.',
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: {
-          hour: hours,
-          minute: minutes,
-          repeats: true,
-        },
-      });
+      console.log('Bildirim ayarlanıyor...', `Saat: ${hours}:${minutes}`);
+      
+      // Önce test bildirimi gönder (hemen gönderilen bildirim çalışıyor mu kontrol et)
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: language === 'tr' ? '✅ Test Bildirimi' : language === 'en' ? '✅ Test Notification' : '✅ إشعار تجريبي',
+            body: language === 'tr' ? 'Bildirimler çalışıyor!' : language === 'en' ? 'Notifications are working!' : 'الإشعارات تعمل!',
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { type: 'test' },
+          },
+          trigger: null, // Hemen gönder
+        });
+        console.log('Test bildirimi gönderildi');
+      } catch (testError) {
+        console.error('Test bildirimi hatası:', testError);
+      }
+      
+      // Günlük tekrarlayan bildirim ayarla
+      let notificationId;
+      try {
+        notificationId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: language === 'tr' ? '🕌 Zikir Zamanı!' : language === 'en' ? '🕌 Dhikr Time!' : '🕌 وقت الذكر!',
+            body: language === 'tr' ? 'Günlük zikir hedefinize ulaşmak için başlayın.' : language === 'en' ? 'Start to reach your daily dhikr target.' : 'ابدأ للوصول إلى هدف الذكر اليومي.',
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { type: 'reminder' },
+          },
+          trigger: {
+            hour: hours,
+            minute: minutes,
+            repeats: true,
+          },
+        });
+        
+        console.log('Bildirim ID:', notificationId);
+      } catch (scheduleError) {
+        console.error('Bildirim ayarlama hatası:', scheduleError);
+        throw scheduleError; // Hatayı yukarı fırlat
+      }
+      
+      // Ayarlanan bildirimleri kontrol et
+      const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      console.log('Toplam ayarlanan bildirim sayısı:', scheduledNotifications.length);
+      if (scheduledNotifications.length > 0) {
+        console.log('İlk bildirim detayları:', JSON.stringify(scheduledNotifications[0], null, 2));
+      } else {
+        console.warn('⚠️ Hiç bildirim ayarlanmamış! Expo Go sınırlaması olabilir.');
+      }
+      
+      // Test için: Eğer seçilen saat geçmişse, bir sonraki gün için ayarlandığını kontrol et
+      const now = new Date();
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime < now) {
+        console.log('Seçilen saat bugün geçti, yarın için ayarlandı');
+      } else {
+        console.log('Bildirim bugün', selectedTime.toLocaleTimeString(), 'saatinde gönderilecek');
+      }
+      
+      return notificationId;
     } catch (error) {
       console.error('Hatırlatıcı ayarlama hatası:', error);
+      Alert.alert(
+        language === 'tr' ? 'Hata' : language === 'en' ? 'Error' : 'خطأ',
+        language === 'tr' 
+          ? 'Hatırlatıcı ayarlanırken bir hata oluştu. Lütfen tekrar deneyin.' 
+          : language === 'en' 
+          ? 'An error occurred while setting the reminder. Please try again.'
+          : 'حدث خطأ أثناء تعيين التذكير. يرجى المحاولة مرة أخرى.',
+        [{ text: language === 'tr' ? 'Tamam' : language === 'en' ? 'OK' : 'حسناً' }]
+      );
     }
   };
 
   const handleResetAllData = () => {
     Alert.alert(
-      'Tüm Verileri Sıfırla',
-      'Bu işlem tüm zikir kayıtlarını, hedefleri ve özel zikirleri siler. Bu işlem geri alınamaz. Emin misiniz?',
+      t.resetAllData,
+      language === 'tr' ? 'Bu işlem tüm zikir kayıtlarını, hedefleri ve özel zikirleri siler. Bu işlem geri alınamaz. Emin misiniz?' : language === 'en' ? 'This will delete all dhikr records, targets, and custom dhikrs. This action cannot be undone. Are you sure?' : 'سيؤدي هذا إلى حذف جميع سجلات الذكر والأهداف والأذكار المخصصة. لا يمكن التراجع عن هذا الإجراء. هل أنت متأكد؟',
       [
-        { text: 'İptal', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: 'Sıfırla',
+          text: t.reset,
           style: 'destructive',
           onPress: async () => {
             if (!db) return;
@@ -1705,12 +2673,12 @@ function SettingsScreen() {
               await db.execAsync('DELETE FROM zikir_targets;');
               await db.execAsync('DELETE FROM custom_zikirs;');
               if (hapticEnabled) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                safeNotificationAsync('Success');
               }
-              Alert.alert('Başarılı', 'Tüm veriler sıfırlandı');
+              Alert.alert(t.success, t.resetSuccess);
             } catch (error) {
               console.error('Veri sıfırlama hatası:', error);
-              Alert.alert('Hata', 'Veriler sıfırlanamadı');
+              Alert.alert(t.error, t.resetError);
             }
           },
         },
@@ -1724,20 +2692,25 @@ function SettingsScreen() {
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <StatusBar style="light" />
       <View style={[styles.header, { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
-        <Text style={[styles.headerTitle, { color: themeColors.text }]}>Ayarlar</Text>
-        <Text style={[styles.headerSubtitle, { color: themeColors.textMuted }]}>Uygulama Ayarları</Text>
+        <Text style={[styles.headerTitle, { color: themeColors.text }]}>{t.settings}</Text>
+        <Text style={[styles.headerSubtitle, { color: themeColors.textMuted }]}>{t.appSettings}</Text>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={[styles.settingsSection, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>Tema</Text>
+          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>{t.theme}</Text>
           <Text style={[styles.settingsSectionDescription, { color: themeColors.textMuted }]}>
-            Uygulama temasını seçin
+            {language === 'tr' ? 'Uygulama temasını seçin' : language === 'en' ? 'Select app theme' : 'اختر مظهر التطبيق'}
           </Text>
           
           {Object.keys(themeThemes).map((themeKey) => {
             const themeData = themeThemes[themeKey];
             const isSelected = currentTheme === themeKey;
+            const themeName = t[`theme_${themeKey}_name`] || themeData.name;
+            const themeDescription = t[`theme_${themeKey}_description`] || themeData.description;
             return (
               <TouchableOpacity
                 key={themeKey}
@@ -1760,10 +2733,10 @@ function SettingsScreen() {
                   </View>
                   <View style={styles.themeInfo}>
                     <Text style={[styles.themeName, { color: themeColors.text }]}>
-                      {themeData.name}
+                      {themeName}
                     </Text>
                     <Text style={[styles.themeDescription, { color: themeColors.textMuted }]}>
-                      {themeData.description}
+                      {themeDescription}
                     </Text>
                   </View>
                   {isSelected && (
@@ -1779,9 +2752,9 @@ function SettingsScreen() {
 
         {/* Varsayılan Hedef */}
         <View style={[styles.settingsSection, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>Varsayılan Hedef</Text>
+          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>{t.defaultTarget}</Text>
           <Text style={[styles.settingsSectionDescription, { color: themeColors.textMuted }]}>
-            Yeni zikirler için varsayılan günlük hedef (şu an: 100)
+            {t.defaultTargetDesc}
           </Text>
           <View style={styles.settingRow}>
             <TextInput
@@ -1793,91 +2766,173 @@ function SettingsScreen() {
               onChangeText={setDefaultTarget}
               onSubmitEditing={(e) => handleDefaultTargetChange(e.nativeEvent.text)}
             />
-            <TouchableOpacity
-              style={[styles.settingButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => handleDefaultTargetChange(defaultTarget)}
-            >
-              <Text style={styles.settingButtonText}>Kaydet</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.settingButton, { backgroundColor: themeColors.primary }]}
+                onPress={() => handleDefaultTargetChange(defaultTarget)}
+              >
+                <Text style={styles.settingButtonText}>{t.save}</Text>
+              </TouchableOpacity>
           </View>
         </View>
 
         {/* Haptic Feedback */}
         <View style={[styles.settingsSection, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>Haptic Feedback</Text>
+          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>{t.hapticFeedback}</Text>
           <Text style={[styles.settingsSectionDescription, { color: themeColors.textMuted }]}>
-            Dokunma geri bildirimini aç/kapat
+            {language === 'tr' ? 'Dokunma geri bildirimini aç/kapat' : language === 'en' ? 'Enable/disable touch feedback' : 'تفعيل/تعطيل رد اللمس'}
           </Text>
           <TouchableOpacity
             style={[styles.settingToggle, { backgroundColor: hapticEnabled ? themeColors.primary : themeColors.surfaceLight, borderColor: themeColors.border }]}
             onPress={handleHapticToggle}
           >
             <Text style={[styles.settingToggleText, { color: hapticEnabled ? '#ffffff' : themeColors.text }]}>
-              {hapticEnabled ? 'Açık' : 'Kapalı'}
+              {hapticEnabled ? t.on : t.off}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Günlük Hatırlatıcı */}
         <View style={[styles.settingsSection, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>Günlük Hatırlatıcı</Text>
+          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>{t.dailyReminder}</Text>
           <Text style={[styles.settingsSectionDescription, { color: themeColors.textMuted }]}>
-            Her gün belirlediğiniz saatte zikir yapmanız için hatırlatıcı alın
+            {language === 'tr' ? 'Her gün belirlediğiniz saatte zikir yapmanız için hatırlatıcı alın' : language === 'en' ? 'Get a reminder at your set time each day to do dhikr' : 'احصل على تذكير في الوقت المحدد كل يوم لأداء الذكر'}
           </Text>
           <TouchableOpacity
             style={[styles.settingToggle, { backgroundColor: reminderEnabled ? themeColors.primary : themeColors.surfaceLight, borderColor: themeColors.border }]}
             onPress={handleReminderToggle}
           >
             <Text style={[styles.settingToggleText, { color: reminderEnabled ? '#ffffff' : themeColors.text }]}>
-              {reminderEnabled ? 'Açık' : 'Kapalı'}
+              {reminderEnabled ? t.on : t.off}
             </Text>
           </TouchableOpacity>
           {reminderEnabled && (
-            <View style={styles.reminderTimeContainer}>
-              <TextInput
-                style={[styles.settingInput, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
-                placeholder="Saat (HH:MM)"
-                placeholderTextColor={themeColors.textMuted}
-                value={reminderTime}
-                onChangeText={setReminderTime}
-                keyboardType="numeric"
-              />
-              <TouchableOpacity
-                style={[styles.settingButton, { backgroundColor: themeColors.primary }]}
-                onPress={handleReminderTimeChange}
-              >
-                <Text style={styles.settingButtonText}>Kaydet</Text>
-              </TouchableOpacity>
+            <View style={styles.timePickerContainer}>
+              <View style={styles.timePickerRow}>
+                {/* Saat Seçici */}
+                <View style={styles.timePickerGroup}>
+                  <Text style={[styles.timePickerLabel, { color: themeColors.textMuted }]}>
+                    {language === 'tr' ? 'Saat' : language === 'en' ? 'Hour' : 'ساعة'}
+                  </Text>
+                  <View style={[styles.timePickerControls, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                    <TouchableOpacity
+                      style={[styles.timePickerButton, { backgroundColor: themeColors.surfaceLight }]}
+                      onPress={() => {
+                        const newHours = tempHours <= 0 ? 23 : tempHours - 1;
+                        setTempHours(newHours);
+                        safeImpactAsync('Light');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.timePickerButtonText, { color: themeColors.text }]}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.timePickerValue, { color: themeColors.text }]}>
+                      {String(tempHours).padStart(2, '0')}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.timePickerButton, { backgroundColor: themeColors.surfaceLight }]}
+                      onPress={() => {
+                        const newHours = tempHours >= 23 ? 0 : tempHours + 1;
+                        setTempHours(newHours);
+                        safeImpactAsync('Light');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.timePickerButtonText, { color: themeColors.text }]}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <Text style={[styles.timePickerSeparator, { color: themeColors.text }]}>:</Text>
+
+                {/* Dakika Seçici */}
+                <View style={styles.timePickerGroup}>
+                  <Text style={[styles.timePickerLabel, { color: themeColors.textMuted }]}>
+                    {language === 'tr' ? 'Dakika' : language === 'en' ? 'Minute' : 'دقيقة'}
+                  </Text>
+                  <View style={[styles.timePickerControls, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                    <TouchableOpacity
+                      style={[styles.timePickerButton, { backgroundColor: themeColors.surfaceLight }]}
+                      onPress={() => {
+                        const newMinutes = tempMinutes <= 0 ? 59 : tempMinutes - 1;
+                        setTempMinutes(newMinutes);
+                        safeImpactAsync('Light');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.timePickerButtonText, { color: themeColors.text }]}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.timePickerValue, { color: themeColors.text }]}>
+                      {String(tempMinutes).padStart(2, '0')}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.timePickerButton, { backgroundColor: themeColors.surfaceLight }]}
+                      onPress={() => {
+                        const newMinutes = tempMinutes >= 59 ? 0 : tempMinutes + 1;
+                        setTempMinutes(newMinutes);
+                        safeImpactAsync('Light');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.timePickerButtonText, { color: themeColors.text }]}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.timePickerActionButtons}>
+                <TouchableOpacity
+                  style={[styles.timePickerActionButton, { backgroundColor: themeColors.surfaceLight, borderColor: themeColors.border }]}
+                  onPress={() => {
+                    const timeParts = reminderTime.split(':');
+                    setTempHours(parseInt(timeParts[0]) || 9);
+                    setTempMinutes(parseInt(timeParts[1]) || 0);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.timePickerActionButtonText, { color: themeColors.text }]}>
+                    {t.cancel}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.timePickerActionButton, { backgroundColor: themeColors.primary }]}
+                  onPress={handleTimePickerConfirm}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.timePickerActionButtonText}>
+                    {t.save}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
 
         {/* Veri Yönetimi */}
         <View style={[styles.settingsSection, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>Veri Yönetimi</Text>
+          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>{t.dataManagement}</Text>
           <Text style={[styles.settingsSectionDescription, { color: themeColors.textMuted }]}>
-            Tüm verileri sıfırla
+            {t.resetAllDataDesc}
           </Text>
           <TouchableOpacity
             style={[styles.settingDangerButton, { backgroundColor: themeColors.surfaceLight, borderColor: '#ef4444' }]}
             onPress={handleResetAllData}
           >
             <Text style={[styles.settingDangerButtonText, { color: '#ef4444' }]}>
-              Tüm Verileri Sıfırla
+              {t.resetAllData}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Uygulama Hakkında */}
         <View style={[styles.settingsSection, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>Uygulama Hakkında</Text>
+          <Text style={[styles.settingsSectionTitle, { color: themeColors.text }]}>{t.about}</Text>
           <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: themeColors.textMuted }]}>Versiyon</Text>
+            <Text style={[styles.aboutLabel, { color: themeColors.textMuted }]}>{t.version}</Text>
             <Text style={[styles.aboutValue, { color: themeColors.text }]}>1.0.0</Text>
           </View>
           <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: themeColors.textMuted }]}>Geliştirici</Text>
-            <Text style={[styles.aboutValue, { color: themeColors.text }]}>Zikir Sayacı</Text>
+            <Text style={[styles.aboutLabel, { color: themeColors.textMuted }]}>{t.developer}</Text>
+            <Text style={[styles.aboutValue, { color: themeColors.text }]}>{t.appName}</Text>
           </View>
         </View>
       </ScrollView>
@@ -1891,6 +2946,7 @@ function MainTabs() {
   const theme = themeContext?.theme || 'dark';
   const themeThemes = themeContext?.themes || themes;
   const themeColors = themeThemes[theme]?.colors || themeThemes.dark?.colors || themes.dark.colors;
+  const { t } = useLanguage();
 
   return (
     <View style={{ flex: 1, backgroundColor: themeColors.background }}>
@@ -1919,7 +2975,7 @@ function MainTabs() {
         name="Home" 
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Zikirler',
+          tabBarLabel: t.zikirler,
           tabBarIcon: ({ color }) => (
             <Text style={{ color, fontSize: 20 }}>📿</Text>
           ),
@@ -1929,7 +2985,7 @@ function MainTabs() {
         name="Analytics" 
         component={AnalyticsScreen}
         options={{
-          tabBarLabel: 'Analiz',
+          tabBarLabel: t.analytics,
           tabBarIcon: ({ color }) => (
             <Text style={{ color, fontSize: 20 }}>📈</Text>
           ),
@@ -1939,7 +2995,7 @@ function MainTabs() {
         name="Settings" 
         component={SettingsScreen}
         options={{
-          tabBarLabel: 'Ayarlar',
+          tabBarLabel: t.settings,
           tabBarIcon: ({ color }) => (
             <Text style={{ color, fontSize: 20 }}>⚙️</Text>
           ),
@@ -1950,11 +3006,143 @@ function MainTabs() {
   );
 }
 
+// Güncelleme Kontrolü
+const CURRENT_APP_VERSION = '1.0.0'; // app.json'daki version ile aynı olmalı
+const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/yourusername/zikirsayac/main/version.json'; // Bu URL'yi kendi repo'nuzla değiştirin
+
+const checkForUpdates = async (language = 'tr', database = null) => {
+  try {
+    // Güncelleme kontrolü yap (isteğe bağlı - URL yoksa atla)
+    if (!UPDATE_CHECK_URL || UPDATE_CHECK_URL.includes('yourusername')) {
+      return; // URL ayarlanmamışsa kontrol yapma
+    }
+
+    // Daha önce bu versiyon için bildirim gösterilmiş mi kontrol et
+    if (database) {
+      try {
+        const notifiedResult = await database.getAllAsync(
+          'SELECT value FROM settings WHERE key = ?;',
+          ['updateNotifiedVersion']
+        );
+        if (notifiedResult.length > 0 && notifiedResult[0].value) {
+          // Bu versiyon için zaten bildirim gösterilmiş, tekrar gösterme
+          return;
+        }
+      } catch (error) {
+        // Veritabanı hatası - devam et
+      }
+    }
+
+    const response = await fetch(UPDATE_CHECK_URL, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    });
+    
+    if (!response.ok) {
+      return; // Hata durumunda sessizce devam et
+    }
+
+    const data = await response.json();
+    const latestVersion = data.version || data.latestVersion;
+    
+    if (latestVersion && latestVersion !== CURRENT_APP_VERSION) {
+      // Yeni versiyon var - bildirim gönder
+      const updateMessages = {
+        tr: {
+          title: '🔄 Yeni Güncelleme Mevcut!',
+          body: `Versiyon ${latestVersion} yayınlandı. Güncellemek için mağazayı ziyaret edin.`,
+          button: 'Güncelle',
+        },
+        en: {
+          title: '🔄 New Update Available!',
+          body: `Version ${latestVersion} has been released. Visit the store to update.`,
+          button: 'Update',
+        },
+        ar: {
+          title: '🔄 تحديث جديد متاح!',
+          body: `تم إصدار الإصدار ${latestVersion}. قم بزيارة المتجر للتحديث.`,
+          button: 'تحديث',
+        },
+      };
+
+      const messages = updateMessages[language] || updateMessages.tr;
+      
+      // Bildirim gönder
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: messages.title,
+            body: messages.body,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { type: 'update', version: latestVersion },
+          },
+          trigger: null, // Hemen gönder
+        });
+      } catch (error) {
+        // Bildirim hatası - devam et
+      }
+
+      // Alert göster
+      Alert.alert(
+        messages.title,
+        messages.body,
+        [
+          {
+            text: language === 'tr' ? 'Daha Sonra' : language === 'en' ? 'Later' : 'لاحقاً',
+            style: 'cancel',
+            onPress: async () => {
+              // Bildirimi kaydet (tekrar gösterme)
+              if (database) {
+                try {
+                  await database.runAsync(
+                    'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);',
+                    ['updateNotifiedVersion', latestVersion]
+                  );
+                } catch (error) {
+                  // Hata sessizce yok sayılır
+                }
+              }
+            },
+          },
+          {
+            text: messages.button,
+            onPress: async () => {
+              // Bildirimi kaydet
+              if (database) {
+                try {
+                  await database.runAsync(
+                    'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);',
+                    ['updateNotifiedVersion', latestVersion]
+                  );
+                } catch (error) {
+                  // Hata sessizce yok sayılır
+                }
+              }
+              // Play Store veya App Store'a yönlendir
+              const storeUrl = Platform.OS === 'android'
+                ? 'https://play.google.com/store/apps/details?id=com.zikirsayac.app'
+                : 'https://apps.apple.com/app/zikirsayac';
+              Linking.openURL(storeUrl).catch(() => {});
+            },
+          },
+        ]
+      );
+    }
+  } catch (error) {
+    // Hata durumunda sessizce devam et
+    console.log('Güncelleme kontrolü hatası:', error);
+  }
+};
+
 // Ana App Component
 function AppContent() {
   const [loading, setLoading] = useState(true);
   const [db, setDb] = useState(null);
   const [theme, setTheme] = useState('dark');
+  const [language, setLanguage] = useState('tr');
 
   useEffect(() => {
     // Bildirim ayarlarını yapılandır
@@ -1965,6 +3153,20 @@ function AppContent() {
         shouldSetBadge: false,
       }),
     });
+
+    // Uygulama açıldığında bildirim izinlerini kontrol et
+    const checkNotificationPermissions = async () => {
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('Bildirim izni henüz verilmemiş');
+        }
+      } catch (error) {
+        console.log('Bildirim izni kontrol edilemedi:', error);
+      }
+    };
+    
+    checkNotificationPermissions();
 
     // Android sistem navigation bar'ı görünür yap ve tema rengine göre ayarla
     const setupNavigationBar = async () => {
@@ -1987,7 +3189,13 @@ function AppContent() {
         setDb(database);
         await initDatabase(database);
         await loadSavedTheme(database);
+        await loadSavedLanguage(database);
         setLoading(false);
+        
+        // Uygulama yüklendikten sonra güncelleme kontrolü yap
+        setTimeout(() => {
+          checkForUpdates(language, database);
+        }, 2000); // 2 saniye bekle (kullanıcı deneyimini bozmamak için)
       } catch (error) {
         console.error('Veritabanı başlatma hatası:', error);
         setLoading(false);
@@ -2029,6 +3237,51 @@ function AppContent() {
       console.error('Tema yüklenirken hata:', error);
     }
   };
+
+  const loadSavedLanguage = async (database) => {
+    try {
+      const result = await database.getAllAsync(
+        'SELECT value FROM settings WHERE key = ?;',
+        ['language']
+      );
+      if (result.length > 0 && translations[result[0].value]) {
+        setLanguage(result[0].value);
+      }
+    } catch (error) {
+      console.error('Dil yüklenirken hata:', error);
+    }
+  };
+
+  const saveLanguage = async (database, lang) => {
+    try {
+      const existing = await database.getAllAsync(
+        'SELECT id FROM settings WHERE key = ?;',
+        ['language']
+      );
+      if (existing.length > 0) {
+        await database.runAsync(
+          'UPDATE settings SET value = ? WHERE key = ?;',
+          [lang, 'language']
+        );
+      } else {
+        await database.runAsync(
+          'INSERT INTO settings (key, value) VALUES (?, ?);',
+          ['language', lang]
+        );
+      }
+    } catch (error) {
+      console.error('Dil kaydetme hatası:', error);
+    }
+  };
+
+  const handleLanguageChange = async (lang) => {
+    setLanguage(lang);
+    if (db) {
+      await saveLanguage(db, lang);
+    }
+  };
+
+  const t = translations[language] || translations.tr;
 
   const initDatabase = async (database) => {
     try {
@@ -2112,8 +3365,9 @@ function AppContent() {
 
   return (
     <DatabaseContext.Provider value={db}>
-      <ThemeContext.Provider value={{ theme, setTheme, themes }}>
-        <NavigationContainer 
+      <LanguageContext.Provider value={{ language, setLanguage: handleLanguageChange, t }}>
+        <ThemeContext.Provider value={{ theme, setTheme, themes }}>
+          <NavigationContainer 
           onStateChange={handleNavigationStateChange}
         >
           <View style={{ flex: 1, backgroundColor: themes[theme]?.colors?.background || themes.dark.colors.background }}>
@@ -2144,6 +3398,7 @@ function AppContent() {
           </View>
         </NavigationContainer>
       </ThemeContext.Provider>
+      </LanguageContext.Provider>
     </DatabaseContext.Provider>
   );
 }
@@ -2168,17 +3423,49 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 10,
     paddingHorizontal: 16,
     backgroundColor: '#1e293b',
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomColor: '#334155',
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerAccent: {
+    width: 4,
+    height: 24,
+    borderRadius: 2,
+  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  headerRightAccent: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  languageSelector: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+  },
+  languageText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
     fontSize: 13,
@@ -2383,7 +3670,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     fontSize: 14,
     borderWidth: 1,
+    marginBottom: 10,
     borderColor: '#334155',
+  },
+  arabicInput: {
+    textAlign: 'right',
+    fontSize: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Arial' : 'sans-serif',
   },
   addButton: {
     backgroundColor: '#6366f1',
@@ -2488,6 +3781,15 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 60,
+  },
+  deleteButton: {
+    padding: 6,
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 20,
   },
   scrollView: {
     flex: 1,
@@ -3037,6 +4339,73 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     gap: 8,
+  },
+  timePickerContainer: {
+    marginTop: 12,
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  timePickerGroup: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  timePickerLabel: {
+    fontSize: 12,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  timePickerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 8,
+  },
+  timePickerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timePickerButtonText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  timePickerValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    minWidth: 50,
+    textAlign: 'center',
+  },
+  timePickerSeparator: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  timePickerActionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timePickerActionButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  timePickerActionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   settingToggleText: {
     fontSize: 14,

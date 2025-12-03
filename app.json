@@ -23,7 +23,8 @@
       "edgeToEdgeEnabled": false,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED"
-      ]
+      ],
+      "package": "com.celilcavus.zikirsayac"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,6 +39,11 @@
         }
       ],
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f945a7bc-1e74-424c-b474-75c8d15d561e"
+      }
+    }
   }
 }
