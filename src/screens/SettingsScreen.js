@@ -493,7 +493,7 @@ function SettingsScreen() {
     );
   };
 
-  const themeColors = themes[currentTheme]?.colors || themes.dark.colors;
+  const themeColors = themes[currentTheme]?.colors || themes.gold.colors;
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>

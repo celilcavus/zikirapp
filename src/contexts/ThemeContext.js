@@ -10,7 +10,7 @@ export const useTheme = () => {
   
   // Default tema değerleri - Context henüz sağlanmamışsa veya null ise
   const defaultTheme = {
-    theme: 'dark',
+    theme: 'gold',
     setTheme: () => {},
     themes: themes,
   };

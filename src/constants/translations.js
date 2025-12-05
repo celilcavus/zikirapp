@@ -1,7 +1,7 @@
 // Dil Çevirileri
 export const translations = {
   tr: {
-    appName: 'Zikir Matik',
+    appName: 'Zikir Sayacı',
     selectZikir: 'Zikir Seçin',
     customZikir: 'Özel Zikirler',
     addCustomZikir: 'Özel Zikir Ekle',
@@ -14,7 +14,7 @@ export const translations = {
     target: 'Hedef',
     progress: 'İlerleme',
     reset: 'Sıfırla',
-    analytics: 'İstatistikler',
+    analytics: 'Analiz',
     settings: 'Ayarlar',
     zikirler: 'Zikirler',
     recommendedZikirs: 'Önerilen Zikirler',
@@ -141,7 +141,7 @@ export const translations = {
     target: 'Target',
     progress: 'Progress',
     reset: 'Reset',
-    analytics: 'Statistics',
+    analytics: 'Analytics',
     settings: 'Settings',
     zikirler: 'Dhikrs',
     recommendedZikirs: 'Recommended Dhikrs',
@@ -268,7 +268,7 @@ export const translations = {
     target: 'الهدف',
     progress: 'التقدم',
     reset: 'إعادة تعيين',
-    analytics: 'الإحصائيات',
+    analytics: 'التحليلات',
     settings: 'الإعدادات',
     zikirler: 'الأذكار',
     recommendedZikirs: 'الأذكار المقترحة',

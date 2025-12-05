@@ -24,7 +24,7 @@ import RootNavigator from './src/navigation/StackNavigator';
 function App() {
   const [loading, setLoading] = useState(true);
   const [db, setDb] = useState(null);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('gold');
   const [language, setLanguage] = useState('tr');
 
   useEffect(() => {
@@ -106,12 +106,18 @@ function App() {
 
   const loadSavedTheme = async (database) => {
     try {
-      const savedTheme = await loadSetting(database, 'theme', 'dark');
+      const savedTheme = await loadSetting(database, 'theme', null);
       if (savedTheme && themes[savedTheme]) {
         setTheme(savedTheme);
+      } else {
+        // İlk kurulumda varsayılan olarak gold temasını kaydet
+        setTheme('gold');
+        await saveSetting(database, 'theme', 'gold');
       }
     } catch (error) {
       console.error('Tema yüklenirken hata:', error);
+      // Hata durumunda da gold tema kullan
+      setTheme('gold');
     }
   };
 
@@ -167,7 +173,7 @@ function App() {
     <DatabaseContext.Provider value={db}>
       <LanguageContext.Provider value={{ language, setLanguage: handleLanguageChange, t }}>
         <ThemeContext.Provider value={{ theme, setTheme: handleThemeChange, themes }}>
-          <View style={{ flex: 1, backgroundColor: themes[theme]?.colors?.background || themes.dark.colors.background }}>
+          <View style={{ flex: 1, backgroundColor: themes[theme]?.colors?.background || themes.gold.colors.background }}>
             <StatusBar style="light" />
             <NavigationContainer onStateChange={handleNavigationStateChange}>
               <RootNavigator />

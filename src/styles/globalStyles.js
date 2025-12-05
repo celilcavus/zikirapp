@@ -78,6 +78,7 @@ export const globalStyles = StyleSheet.create({
   zikirGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 10,
     marginBottom: 16,
   },
