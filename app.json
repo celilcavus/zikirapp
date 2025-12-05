@@ -8,23 +8,27 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash-screen.jpg",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1E40AF"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#4FD1C7"
       },
       "edgeToEdgeEnabled": false,
       "permissions": [
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
       ],
-      "package": "com.celilcavus.zikirsayac"
+      "package": "com.celilcavus.zikirsayac",
+      "versionCode": 1,
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.celilcavus.zikirsayac"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,7 +38,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#6366f1",
+          "color": "#4FD1C7",
           "sounds": []
         }
       ],
